@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
@@ -12,9 +14,41 @@ export default function LoginPage() {
         password: "",
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const { setUser } = useAuth();
+    const router = useRouter();
+
+    // ✅ FIXED LOGIN FUNCTION (INI YANG PENTING)
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Login data:", formData);
+
+        try {
+            const res = await fetch("http://localhost:8000/api/auth/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.message || "Login gagal");
+                return;
+            }
+
+            // 🔥 simpan token
+            localStorage.setItem("token", data.token);
+
+            // 🔥 set user global (langsung ubah header)
+            setUser(data.user);
+
+            // 🔥 redirect ke home
+            router.push("/");
+        } catch (error) {
+            console.error(error);
+            alert("Terjadi kesalahan koneksi");
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

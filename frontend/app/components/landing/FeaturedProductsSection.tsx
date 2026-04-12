@@ -10,7 +10,10 @@ type Product = {
     image: string;
 };
 
-const products: Product[] = [
+/* =========================
+   BARIS PERTAMA
+========================= */
+const productsTop: Product[] = [
     {
         id: 1,
         name: "RGB Mechanical Keyboard",
@@ -41,6 +44,40 @@ const products: Product[] = [
     },
 ];
 
+/* =========================
+   BARIS KEDUA
+========================= */
+const productsBottom: Product[] = [
+    {
+        id: 5,
+        name: "Gaming Mouse RGB",
+        price: 89.99,
+        rating: 5,
+        image: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7",
+    },
+    {
+        id: 6,
+        name: "UltraWide Monitor",
+        price: 499.99,
+        rating: 5,
+        image: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7",
+    },
+    {
+        id: 7,
+        name: "Gaming Chair Pro",
+        price: 299.99,
+        rating: 5,
+        image: "https://images.unsplash.com/photo-1598550476439-6847785fcea6",
+    },
+    {
+        id: 8,
+        name: "External Hard Drive 2TB",
+        price: 179.99,
+        rating: 5,
+        image: "https://images.unsplash.com/photo-1612817288484-6f916006741a",
+    },
+];
+
 export default function FeaturedProductsSection() {
     return (
         <section className="bg-white py-20 lg:py-28">
@@ -57,65 +94,83 @@ export default function FeaturedProductsSection() {
                     </p>
                 </div>
 
-                {/* Product Grid */}
+                {/* =========================
+                    GRID BARIS 1
+                ========================= */}
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {products.map((product) => (
-                        <div
-                            key={product.id}
-                            className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-2 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/10"
-                        >
-                            {/* Product Image */}
-                            <Link href={`/products/${product.id}`}>
-                                <div className="relative aspect-square bg-gray-50 overflow-hidden">
-                                    <Image
-                                        src={product.image}
-                                        alt={product.name}
-                                        fill
-                                        sizes="(max-width:768px) 100vw,
-                           (max-width:1200px) 50vw,
-                           25vw"
-                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                </div>
-                            </Link>
+                    {productsTop.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))}
+                </div>
 
-                            {/* Product Info */}
-                            <div className="p-6 space-y-4">
-                                <div>
-                                    <Link href={`/products/${product.id}`}>
-                                        <h3 className="text-lg font-medium text-gray-900 transition-colors group-hover:text-blue-600">
-                                            {product.name}
-                                        </h3>
-                                    </Link>
+                {/* JARAK */}
+                <div className="mt-10"></div>
 
-                                    {/* Rating */}
-                                    <div className="mt-2 flex items-center gap-1">
-                                        {Array.from({
-                                            length: product.rating,
-                                        }).map((_, i) => (
-                                            <Star
-                                                key={i}
-                                                className="h-4 w-4 fill-blue-600 text-blue-600"
-                                            />
-                                        ))}
-                                    </div>
-
-                                    {/* Price */}
-                                    <p className="mt-3 text-xl font-semibold text-gray-900">
-                                        ${product.price}
-                                    </p>
-                                </div>
-
-                                {/* Add to Cart */}
-                                <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-white transition-colors duration-300 hover:bg-blue-700">
-                                    <ShoppingCart className="h-5 w-5 transition-transform group-hover:scale-110" />
-                                    Add to Cart
-                                </button>
-                            </div>
-                        </div>
+                {/* =========================
+                    GRID BARIS 2
+                ========================= */}
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {productsBottom.map((product) => (
+                        <ProductCard key={product.id} product={product} />
                     ))}
                 </div>
             </div>
         </section>
+    );
+}
+
+/* =========================
+   COMPONENT CARD
+========================= */
+function ProductCard({ product }: { product: Product }) {
+    return (
+        <div className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-2 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/10">
+            {/* Image */}
+            <Link href={`/products/${product.id}`}>
+                <div className="relative aspect-square bg-gray-50 overflow-hidden">
+                    <Image
+                        src={product.image}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width:768px) 100vw,
+                               (max-width:1200px) 50vw,
+                               25vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                </div>
+            </Link>
+
+            {/* Info */}
+            <div className="p-6 space-y-4">
+                <div>
+                    <Link href={`/products/${product.id}`}>
+                        <h3 className="text-lg font-medium text-gray-900 transition-colors group-hover:text-blue-600">
+                            {product.name}
+                        </h3>
+                    </Link>
+
+                    {/* Rating */}
+                    <div className="mt-2 flex items-center gap-1">
+                        {Array.from({ length: product.rating }).map((_, i) => (
+                            <Star
+                                key={i}
+                                className="h-4 w-4 fill-blue-600 text-blue-600"
+                            />
+                        ))}
+                    </div>
+
+                    {/* Price */}
+                    <p className="mt-3 text-xl font-semibold text-gray-900">
+                        ${product.price}
+                    </p>
+                </div>
+
+                {/* Button */}
+                <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-white transition-colors duration-300 hover:bg-blue-700">
+                    <ShoppingCart className="h-5 w-5 transition-transform group-hover:scale-110" />
+                    Add to Cart
+                </button>
+            </div>
+        </div>
     );
 }

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false);
@@ -15,9 +17,72 @@ export default function RegisterPage() {
         confirmPassword: "",
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const { setUser } = useAuth();
+    const router = useRouter();
+
+    // ✅ FIXED REGISTER + AUTO LOGIN
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Register data:", formData);
+
+        try {
+            // 🔥 REGISTER
+            const registerRes = await fetch(
+                "http://localhost:8000/api/auth/register",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name: formData.fullName,
+                        email: formData.email,
+                        password: formData.password,
+                        password_confirmation: formData.confirmPassword,
+                    }),
+                },
+            );
+
+            const registerData = await registerRes.json();
+
+            if (!registerRes.ok) {
+                alert(registerData.message || "Register gagal");
+                return;
+            }
+
+            // 🔥 AUTO LOGIN
+            const loginRes = await fetch(
+                "http://localhost:8000/api/auth/login",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email: formData.email,
+                        password: formData.password,
+                    }),
+                },
+            );
+
+            const loginData = await loginRes.json();
+
+            if (!loginRes.ok) {
+                alert("Register berhasil, tapi login gagal");
+                return;
+            }
+
+            // 🔥 SIMPAN TOKEN
+            localStorage.setItem("token", loginData.token);
+
+            // 🔥 SET USER GLOBAL (langsung ubah header)
+            setUser(loginData.user);
+
+            // 🔥 REDIRECT KE HOME
+            router.push("/");
+        } catch (error) {
+            console.error(error);
+            alert("Terjadi kesalahan koneksi");
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

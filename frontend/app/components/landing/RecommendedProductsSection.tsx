@@ -10,7 +10,10 @@ type Product = {
     image: string;
 };
 
-const recommendedProducts: Product[] = [
+/* =========================
+   BARIS PERTAMA
+========================= */
+const recommendedProductsTop: Product[] = [
     {
         id: 1,
         name: "Gaming Laptop Pro",
@@ -42,6 +45,40 @@ const recommendedProducts: Product[] = [
     },
 ];
 
+/* =========================
+   BARIS KEDUA
+========================= */
+const recommendedProductsBottom: Product[] = [
+    {
+        id: 5,
+        name: "Mechanical Keyboard RGB",
+        description: "Hot-swappable switches with premium aluminum build",
+        price: 129.99,
+        image: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7",
+    },
+    {
+        id: 6,
+        name: "4K Gaming Monitor",
+        description: "Ultra HD resolution with 144Hz refresh rate",
+        price: 599.99,
+        image: "https://images.unsplash.com/photo-1587202372775-e229f172b9d7",
+    },
+    {
+        id: 7,
+        name: "Gaming Chair Pro",
+        description: "Ergonomic design with adjustable lumbar support",
+        price: 199.99,
+        image: "https://images.unsplash.com/photo-1598550476439-6847785fcea6",
+    },
+    {
+        id: 8,
+        name: "External SSD 1TB",
+        description: "High-speed portable storage with USB-C interface",
+        price: 149.99,
+        image: "https://images.unsplash.com/photo-1612817288484-6f916006741a",
+    },
+];
+
 export default function RecommendedProductsSection() {
     return (
         <section className="bg-gradient-to-b from-gray-50 to-white py-20 lg:py-28">
@@ -58,59 +95,79 @@ export default function RecommendedProductsSection() {
                     </p>
                 </div>
 
-                {/* Product Grid */}
+                {/* =========================
+                    GRID BARIS 1
+                ========================= */}
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {recommendedProducts.map((product) => (
-                        <div
-                            key={product.id}
-                            className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/10"
-                        >
-                            {/* Product Image */}
-                            <Link href={`/products/${product.id}`}>
-                                <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
-                                    <Image
-                                        src={product.image}
-                                        alt={product.name}
-                                        fill
-                                        sizes="(max-width:768px) 100vw,
-                           (max-width:1200px) 50vw,
-                           25vw"
-                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                </div>
-                            </Link>
+                    {recommendedProductsTop.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))}
+                </div>
 
-                            {/* Product Info */}
-                            <div className="p-6 space-y-4">
-                                <div>
-                                    <Link href={`/products/${product.id}`}>
-                                        <h3 className="text-lg font-medium text-gray-900 transition-colors group-hover:text-blue-600">
-                                            {product.name}
-                                        </h3>
-                                    </Link>
+                {/* JARAK ANTAR BARIS */}
+                <div className="mt-10"></div>
 
-                                    <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                                        {product.description}
-                                    </p>
-
-                                    <p className="mt-3 text-xl font-semibold text-gray-900">
-                                        ${product.price}
-                                    </p>
-                                </div>
-
-                                {/* View Product Button */}
-                                <Link
-                                    href={`/products/${product.id}`}
-                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 px-4 py-3 text-blue-600 transition-all duration-300 hover:bg-blue-600 hover:text-white"
-                                >
-                                    View Product
-                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                                </Link>
-                            </div>
-                        </div>
+                {/* =========================
+                    GRID BARIS 2
+                ========================= */}
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {recommendedProductsBottom.map((product) => (
+                        <ProductCard key={product.id} product={product} />
                     ))}
                 </div>
             </div>
         </section>
+    );
+}
+
+/* =========================
+   COMPONENT CARD (REUSABLE)
+========================= */
+function ProductCard({ product }: { product: Product }) {
+    return (
+        <div className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/10">
+            {/* Image */}
+            <Link href={`/products/${product.id}`}>
+                <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
+                    <Image
+                        src={product.image}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width:768px) 100vw,
+                               (max-width:1200px) 50vw,
+                               25vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                </div>
+            </Link>
+
+            {/* Info */}
+            <div className="p-6 space-y-4">
+                <div>
+                    <Link href={`/products/${product.id}`}>
+                        <h3 className="text-lg font-medium text-gray-900 transition-colors group-hover:text-blue-600">
+                            {product.name}
+                        </h3>
+                    </Link>
+
+                    <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                        {product.description}
+                    </p>
+
+                    <p className="mt-3 text-xl font-semibold text-gray-900">
+                        ${product.price}
+                    </p>
+                </div>
+
+                {/* Button */}
+                <Link
+                    href={`/products/${product.id}`}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 px-4 py-3 text-blue-600 transition-all duration-300 hover:bg-blue-600 hover:text-white"
+                >
+                    View Product
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+            </div>
+        </div>
     );
 }
