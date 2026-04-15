@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     FolderTree,
@@ -10,14 +11,29 @@ import {
 } from "lucide-react";
 
 const menu = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "kategori", label: "Manajemen Kategori", icon: FolderTree },
-    { id: "produk", label: "Manajemen Produk", icon: Package },
-    { id: "order", label: "Manajemen Order", icon: ShoppingCart },
+    { id: "dashboard", label: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { id: "kategori", label: "Manajemen Kategori", href: "/admin/category", icon: FolderTree },
+    { id: "produk", label: "Manajemen Produk", href: "/admin/product", icon: Package },
+    { id: "order", label: "Manajemen Order", href: "/admin/order", icon: ShoppingCart },
 ];
 
 export default function Sidebar() {
-    const [active, setActive] = useState("dashboard");
+    const router = useRouter();
+    const pathname = usePathname();
+
+    const getActiveMenu = () => {
+        if (pathname === "/admin/category") return "kategori";
+        if (pathname === "/admin/product") return "produk";
+        if (pathname === "/admin/order") return "order";
+        if (pathname === "/admin") return "dashboard";
+        return "dashboard";
+    };
+
+    const [active, setActive] = useState(getActiveMenu());
+
+    useEffect(() => {
+        setActive(getActiveMenu());
+    }, [pathname]);
 
     return (
         <aside className="w-64 bg-white fixed h-full border-r flex flex-col">
@@ -31,7 +47,10 @@ export default function Sidebar() {
                     return (
                         <button
                             key={item.id}
-                            onClick={() => setActive(item.id)}
+                            onClick={() => {
+                                setActive(item.id);
+                                router.push(item.href);
+                            }}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
                                 isActive
                                     ? "bg-blue-500 text-white"
