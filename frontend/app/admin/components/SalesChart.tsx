@@ -20,10 +20,10 @@ const data = [
 
 export default function SalesChart() {
     return (
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <div className="bg-white p-4 rounded-lg border shadow-sm sm:p-6">
             <h3 className="font-bold mb-4">Grafik Penjualan</h3>
 
-            <div className="h-64">
+            <div className="h-64 min-w-0">
                 <ResponsiveContainer>
                     <LineChart data={data}>
                         <XAxis dataKey="month" />

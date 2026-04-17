@@ -50,8 +50,8 @@ export default function OrderTable() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <table className="min-w-[760px] w-full text-sm">
 
         {/* Head */}
         <thead>

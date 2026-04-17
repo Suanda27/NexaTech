@@ -36,8 +36,8 @@ const features: Feature[] = [
 
 export default function WhyChooseUsSection() {
     return (
-        <section className="bg-white py-20 lg:py-28">
-            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <section className="bg-white py-14 sm:py-20 lg:py-28">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Section Heading */}
                 <div className="mx-auto max-w-2xl text-center mb-14 lg:mb-20">
                     <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
@@ -51,14 +51,14 @@ export default function WhyChooseUsSection() {
                 </div>
 
                 {/* Feature Grid */}
-                <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                     {features.map((feature) => {
                         const Icon = feature.icon;
 
                         return (
                             <div
                                 key={feature.title}
-                                className="group relative rounded-2xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-8 transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/5"
+                                className="group relative rounded-lg border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/5 sm:p-8"
                             >
                                 {/* Icon */}
                                 <div className="mb-6">

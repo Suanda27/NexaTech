@@ -2,7 +2,7 @@ import OrderTable from "./OrderTable";
 
 export default function OrderPage() {
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-4 bg-gray-100 min-h-screen sm:p-6">
 
       {/* Header */}
       <div className="mb-6">
@@ -15,7 +15,7 @@ export default function OrderPage() {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex flex-col gap-3 mb-5 sm:flex-row">
         <input
           type="text"
           placeholder="Cari nama customer atau ID order"

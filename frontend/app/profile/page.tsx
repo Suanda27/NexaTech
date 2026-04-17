@@ -19,10 +19,10 @@ export default function Page() {
             <HeaderUser />
 
             {/* CONTENT */}
-            <div className="flex flex-1">
+            <div className="flex flex-1 flex-col lg:flex-row">
                 <Sidebar active={active} setActive={setActive} />
 
-                <div className="flex-1 p-6">
+                <div className="min-w-0 flex-1 p-4 sm:p-6">
                     {active === "orders" && (
                         <>
                             <OrderSummaryCards />

@@ -119,17 +119,17 @@ export default function OrderHistorySection() {
     const filtered = orders.filter((o) => o.method === active);
 
     return (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 mt-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mt-6 shadow-sm sm:p-6">
             {/* TITLE */}
             <h2 className="text-xl font-bold text-gray-900 mb-5">
                 Order History
             </h2>
 
             {/* TOGGLE */}
-            <div className="flex gap-2 bg-gray-100 p-1 rounded-full w-fit mb-6">
+            <div className="flex w-full gap-2 overflow-x-auto rounded-lg bg-gray-100 p-1 mb-6 sm:w-fit">
                 <button
                     onClick={() => setActive("bank")}
-                    className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    className={`min-w-max px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 sm:px-6 ${
                         active === "bank"
                             ? "bg-white text-black shadow-md"
                             : "text-gray-500 hover:text-black"
@@ -140,7 +140,7 @@ export default function OrderHistorySection() {
 
                 <button
                     onClick={() => setActive("cod")}
-                    className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    className={`min-w-max px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 sm:px-6 ${
                         active === "cod"
                             ? "bg-white text-black shadow-md"
                             : "text-gray-500 hover:text-black"

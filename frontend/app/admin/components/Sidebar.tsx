@@ -36,10 +36,10 @@ export default function Sidebar() {
     }, [pathname]);
 
     return (
-        <aside className="w-64 bg-white fixed h-full border-r flex flex-col">
-            <div className="p-6 font-bold text-lg">NexaTech Admin</div>
+        <aside className="w-full shrink-0 bg-white border-b flex flex-col lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-b-0 lg:border-r">
+            <div className="p-4 font-bold text-lg lg:p-6">NexaTech Admin</div>
 
-            <nav className="flex-1 p-4 space-y-2">
+            <nav className="flex gap-2 overflow-x-auto px-4 pb-4 lg:flex-1 lg:flex-col lg:space-y-2 lg:overflow-visible lg:py-4">
                 {menu.map((item) => {
                     const Icon = item.icon;
                     const isActive = active === item.id;
@@ -51,7 +51,7 @@ export default function Sidebar() {
                                 setActive(item.id);
                                 router.push(item.href);
                             }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
+                            className={`flex min-w-max items-center gap-3 px-4 py-3 rounded-lg transition lg:w-full ${
                                 isActive
                                     ? "bg-blue-500 text-white"
                                     : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
@@ -64,8 +64,8 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            <div className="p-4">
-                <button className="flex gap-3 text-red-600 hover:bg-red-50 w-full px-4 py-3 rounded-xl">
+            <div className="hidden p-4 lg:block">
+                <button className="flex gap-3 text-red-600 hover:bg-red-50 w-full px-4 py-3 rounded-lg">
                     <LogOut size={20} />
                     Sign Out
                 </button>

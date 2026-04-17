@@ -7,8 +7,8 @@ export default function CategoryTable() {
   ];
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
+      <table className="min-w-[560px] w-full text-sm">
         
         {/* Head */}
         <thead>

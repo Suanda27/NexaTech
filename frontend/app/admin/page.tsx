@@ -10,8 +10,8 @@ export default function DashboardPage() {
         <>
             <Header />
 
-            <div className="p-8">
-                <div className="grid grid-cols-3 gap-6 mb-8">
+            <div className="p-4 sm:p-6 lg:p-8">
+                <div className="grid grid-cols-1 gap-4 mb-8 sm:grid-cols-2 xl:grid-cols-3 lg:gap-6">
                     <StatsCard
                         title="Total Penjualan"
                         value="Rp 245M"
@@ -29,8 +29,8 @@ export default function DashboardPage() {
                     />
                 </div>
 
-                <div className="grid grid-cols-3 gap-6">
-                    <div className="col-span-2">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                    <div className="xl:col-span-2">
                         <SalesChart />
                     </div>
                     <ProductTable />

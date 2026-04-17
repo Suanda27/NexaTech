@@ -32,8 +32,8 @@ const categories: Category[] = [
 
 export default function ProductCategoriesSection() {
     return (
-        <section className="bg-gradient-to-b from-white to-gray-50 py-20 lg:py-28">
-            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <section className="bg-gradient-to-b from-white to-gray-50 py-14 sm:py-20 lg:py-28">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Heading */}
                 <div className="mx-auto max-w-2xl text-center mb-14 lg:mb-20">
                     <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
@@ -52,7 +52,7 @@ export default function ProductCategoriesSection() {
                         <Link
                             key={category.name}
                             href={`/categories/${category.slug}`}
-                            className="group relative h-72 md:h-80 overflow-hidden rounded-2xl"
+                            className="group relative h-64 overflow-hidden rounded-lg sm:h-72 md:h-80"
                         >
                             {/* Image */}
                             <Image

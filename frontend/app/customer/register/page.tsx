@@ -93,7 +93,7 @@ export default function RegisterPage() {
     };
 
     return (
-        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0A0E1A] via-[#0B1F3A] to-[#050812] px-4">
+        <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0A0E1A] via-[#0B1F3A] to-[#050812] px-4 py-8">
             {/* Background glow */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div className="absolute -left-24 top-1/4 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl animate-pulse"></div>

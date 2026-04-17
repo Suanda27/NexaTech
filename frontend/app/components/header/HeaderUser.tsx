@@ -1,19 +1,21 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Search, ShoppingCart, User, ChevronDown } from "lucide-react";
 
 export default function HeaderUser() {
     return (
         <header className="w-full border-b bg-white">
-            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white font-bold">
-                        T
-                    </div>
-
-                    <span className="hidden font-semibold text-lg text-gray-800 sm:block">
-                        TechStore
-                    </span>
+                    <Image
+                        src="/logoNexaTech.png"
+                        alt="NexaTech Logo"
+                        width={120}
+                        height={48}
+                        className="h-10 w-auto object-contain"
+                        priority
+                    />
                 </Link>
 
                 {/* Search */}
@@ -33,10 +35,10 @@ export default function HeaderUser() {
                 </div>
 
                 {/* Right Menu */}
-                <div className="flex items-center gap-5">
+                <div className="flex shrink-0 items-center gap-3 sm:gap-5">
                     {/* Products */}
                     <Link
-                        href="/products"
+                        href="/product"
                         className="hidden text-gray-700 font-medium hover:text-black md:block"
                     >
                         Products
