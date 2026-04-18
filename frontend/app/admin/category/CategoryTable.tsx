@@ -1,4 +1,15 @@
+"use client";
+
+import { useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
+import EditCategoryModal from "./components/EditCategoryModal";
+import DeleteCategoryModal from "./components/DeleteCategoryModal";
+
 export default function CategoryTable() {
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selected, setSelected] = useState<any>(null);
+
   const data = [
     { name: "Elektronik", total: 128, status: "Active" },
     { name: "Fashion", total: 86, status: "Active" },
@@ -7,57 +18,103 @@ export default function CategoryTable() {
   ];
 
   return (
-    <div className="overflow-x-auto rounded-lg bg-white shadow-sm">
-      <table className="min-w-[560px] w-full text-sm">
-        
-        {/* Head */}
-        <thead>
-          <tr className="text-gray-400 border-b">
-            <th className="text-left pb-3">Nama Kategori</th>
-            <th className="text-left pb-3">Jumlah Produk</th>
-            <th className="text-left pb-3">Status</th>
-            <th className="text-left pb-3">Aksi</th>
-          </tr>
-        </thead>
+    <>
+      <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-gray-200">
+        <table className="min-w-full text-sm">
 
-        {/* Body */}
-        <tbody>
-          {data.map((item, index) => (
-            <tr key={index} className="border-b last:border-none">
-              
-              <td className="py-4 text-gray-700">
-                {item.name}
-              </td>
-
-              <td className="text-gray-600">
-                {item.total}
-              </td>
-
-              <td>
-                <span
-                  className={`px-3 py-1 text-xs rounded-full font-medium ${
-                    item.status === "Active"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-red-100 text-red-500"
-                  }`}
-                >
-                  {item.status}
-                </span>
-              </td>
-
-              <td className="space-x-2">
-                <button className="bg-blue-100 hover:bg-blue-200 text-blue-500 px-2 py-1 rounded-md">
-                  ✏️
-                </button>
-                <button className="bg-red-100 hover:bg-red-200 text-red-500 px-2 py-1 rounded-md">
-                  🗑️
-                </button>
-              </td>
-
+          {/* Head */}
+          <thead className="bg-gradient-to-r from-blue-100 to-indigo-100">
+            <tr className="text-gray-700 text-xs uppercase tracking-wide font-semibold">
+              <th className="text-left px-6 py-4">Nama Kategori</th>
+              <th className="text-left px-6 py-4">Jumlah Produk</th>
+              <th className="text-left px-6 py-4">Status</th>
+              <th className="text-left px-6 py-4">Aksi</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+
+          {/* Body */}
+          <tbody>
+            {data.map((item, index) => (
+              <tr
+                key={index}
+                className="border-t hover:bg-gray-50 transition duration-150"
+              >
+                {/* Nama */}
+                <td className="px-6 py-4 font-medium text-gray-800">
+                  {item.name}
+                </td>
+
+                {/* Jumlah */}
+                <td className="px-6 py-4 text-gray-600">
+                  {item.total}
+                </td>
+
+                {/* Status */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`px-3 py-1 text-xs rounded-full font-medium ${
+                      item.status === "Active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-600"
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+                </td>
+
+                {/* Aksi */}
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+
+                    {/* Edit */}
+                    <button
+                      onClick={() => {
+                        setSelected(item);
+                        setEditOpen(true);
+                      }}
+                      className="p-2 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 transition duration-150 active:scale-95"
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </button>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => {
+                        setSelected(item);
+                        setDeleteOpen(true);
+                      }}
+                      className="p-2 rounded-md bg-red-50 hover:bg-red-100 text-red-500 transition duration-150 active:scale-95"
+                      title="Hapus"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal Edit */}
+      <EditCategoryModal
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        category={selected}
+      />
+
+      {/* Modal Delete */}
+      <DeleteCategoryModal
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          console.log("Hapus:", selected);
+          setDeleteOpen(false);
+        }}
+        category={selected}
+      />
+    </>
   );
 }

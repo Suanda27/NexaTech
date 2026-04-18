@@ -45,3 +45,29 @@ video,
 canvas {
   max-width: 100%;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@layer components {
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-800 
+    placeholder-gray-400
+    focus:ring-2 focus:ring-blue-500 
+    focus:border-blue-500 
+    outline-none 
+    transition;
+  }
+}

@@ -18,7 +18,7 @@ export default function AdminLayout({
                 onToggle={() => setSidebarOpen((prev) => !prev)}
             />
 
-            <div className="flex-1 min-h-screen lg:pl-0">
+            <div className="flex-1 min-h-screen lg:pl-0 min-w-0">
                 <Header
                     mobileOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen((prev) => !prev)}
