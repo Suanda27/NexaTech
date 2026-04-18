@@ -12,7 +12,7 @@ interface HeaderProps {
 export default function Header({ mobileOpen, onToggle }: HeaderProps) {
     const adminInfo = useMemo(
         () => ({ name: "Raka Pranata", role: "Administrator" }),
-        []
+        [],
     );
 
     return (
@@ -39,15 +39,22 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                             />
                         </div>
                         <div>
-                            <p className="text-lg font-semibold text-slate-900">NexaTech Admin</p>
-                            <p className="text-sm text-blue-600">Control panel management</p>
+                            <p className="text-lg font-semibold text-slate-900">
+                                NexaTech Admin
+                            </p>
+                            <p className="text-sm text-blue-600">
+                                Control panel management
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 <div className="order-last w-full md:order-none md:max-w-xl lg:flex-1">
                     <div className="relative mx-auto w-full max-w-xl">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
+                        <Search
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400"
+                            size={18}
+                        />
                         <input
                             type="text"
                             placeholder="Search admin panel..."
@@ -58,7 +65,9 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
 
                 <div className="flex items-center gap-3">
                     <div className="hidden sm:flex flex-col text-right">
-                        <span className="text-sm font-semibold text-slate-900">{adminInfo.name}</span>
+                        <span className="text-sm font-semibold text-slate-900">
+                            {adminInfo.name}
+                        </span>
                         <span className="inline-flex items-center gap-1 text-xs text-blue-600">
                             <Shield size={12} />
                             {adminInfo.role}

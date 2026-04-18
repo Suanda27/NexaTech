@@ -16,13 +16,15 @@ export default function ProductTable() {
                         <p className="font-medium text-slate-900">{p.name}</p>
                         <p className="text-xs text-blue-600">{p.sold} sold</p>
                     </div>
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        p.stock > 20
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : p.stock > 10
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-red-100 text-red-700'
-                    }`}>
+                    <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            p.stock > 20
+                                ? "bg-emerald-100 text-emerald-700"
+                                : p.stock > 10
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-red-100 text-red-700"
+                        }`}
+                    >
                         {p.stock} left
                     </span>
                 </div>
