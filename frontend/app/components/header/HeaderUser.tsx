@@ -1,8 +1,30 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { Search, ShoppingCart, User, ChevronDown } from "lucide-react";
 
 export default function HeaderUser() {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                dropdownRef.current &&
+                event.target instanceof Node &&
+                !dropdownRef.current.contains(event.target)
+            ) {
+                setMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     return (
         <header className="w-full border-b bg-white">
             <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
@@ -29,7 +51,7 @@ export default function HeaderUser() {
                         <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm text-black outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
                 </div>
@@ -54,10 +76,37 @@ export default function HeaderUser() {
                     </Link>
 
                     {/* Profile */}
-                    <button className="flex items-center gap-2 text-gray-700">
-                        <User size={22} />
-                        <ChevronDown size={16} />
-                    </button>
+                    <div className="relative" ref={dropdownRef}>
+                        <button
+                            type="button"
+                            aria-haspopup="menu"
+                            aria-expanded={menuOpen}
+                            onClick={() => setMenuOpen((prev) => !prev)}
+                            className="flex items-center gap-2 text-gray-700"
+                        >
+                            <User size={22} />
+                            <ChevronDown size={16} />
+                        </button>
+
+                        {menuOpen && (
+                            <div className="absolute right-0 z-20 mt-2 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition duration-150 ease-out">
+                                <Link
+                                    href="/profile?tab=orders"
+                                    className="block px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
+                                    onClick={() => setMenuOpen(false)}
+                                >
+                                    Order History
+                                </Link>
+                                <Link
+                                    href="/profile?tab=personal"
+                                    className="block px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
+                                    onClick={() => setMenuOpen(false)}
+                                >
+                                    Personal Info
+                                </Link>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

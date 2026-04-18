@@ -8,10 +8,19 @@ import PersonalInfo from "@/app/components/profile/PersonalInfo";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function Page() {
-    const [active, setActive] = useState("orders");
+    const searchParams = useSearchParams();
+    const tab = searchParams?.get("tab");
+    const [active, setActive] = useState(
+        tab === "personal" ? "personal" : "orders",
+    );
+
+    useEffect(() => {
+        setActive(tab === "personal" ? "personal" : "orders");
+    }, [tab]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
