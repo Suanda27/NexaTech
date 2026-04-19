@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     BadgeCheck,
     CreditCard,
@@ -10,165 +10,62 @@ import {
 } from "lucide-react";
 import OrderTable from "./OrderTable";
 import type { OrderItemData } from "./types";
-import { getOrderTotal } from "./utils";
+import { fetchAdminOrders, updateAdminOrder, type OrderData } from "@/lib/store";
 
-const initialOrders: OrderItemData[] = [
-    {
-        id: "1",
-        orderNumber: "#ORD-3021",
-        customerName: "Nadia Putri",
-        orderDate: "19 Apr 2026",
-        paymentMethod: "Bank Transfer",
-        paymentStatus: "Paid",
-        status: "Delivered",
-        declineReason: null,
-        paymentProofImage:
-            "https://images.unsplash.com/photo-1556740749-887f6717d7e4?q=80&w=1080",
-        customer: {
-            firstName: "Nadia",
-            lastName: "Putri",
-            address: "Jl. Melati Indah No. 24",
-            city: "Bandung",
-            postalCode: "40123",
-        },
-        items: [
-            {
-                id: "i1",
-                productName: "NexaBook Pro 16",
-                productImage:
-                    "https://images.unsplash.com/photo-1658262530868-f7460e2f071f?q=80&w=1080",
-                quantity: 1,
-                unitPrice: 14999000,
-            },
-        ],
-    },
-    {
-        id: "2",
-        orderNumber: "#ORD-3020",
-        customerName: "Bagas Mahendra",
-        orderDate: "18 Apr 2026",
-        paymentMethod: "Bank Transfer",
-        paymentStatus: "Unpaid",
-        status: "Progressing",
-        declineReason: null,
-        paymentProofImage: null,
-        customer: {
-            firstName: "Bagas",
-            lastName: "Mahendra",
-            address: "Perumahan Harmoni Blok C7",
-            city: "Yogyakarta",
-            postalCode: "55281",
-        },
-        items: [
-            {
-                id: "i2",
-                productName: "Orbit Dock Prime",
-                productImage:
-                    "https://images.unsplash.com/photo-1625842268584-8f3296236761?q=80&w=1080",
-                quantity: 1,
-                unitPrice: 1899000,
-            },
-            {
-                id: "i3",
-                productName: "Auralux Studio Max",
-                productImage:
-                    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1080",
-                quantity: 1,
-                unitPrice: 3299000,
-            },
-        ],
-    },
-    {
-        id: "3",
-        orderNumber: "#ORD-3019",
-        customerName: "Salsa Amalia",
-        orderDate: "17 Apr 2026",
-        paymentMethod: "COD",
-        paymentStatus: "Unpaid",
-        status: "Progressing",
-        declineReason: null,
-        paymentProofImage: null,
-        customer: {
-            firstName: "Salsa",
-            lastName: "Amalia",
-            address: "Jl. Kenanga Permai No. 8",
-            city: "Surabaya",
-            postalCode: "60231",
-        },
-        items: [
-            {
-                id: "i4",
-                productName: "VisionPad Ultra",
-                productImage:
-                    "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=1080",
-                quantity: 1,
-                unitPrice: 8799000,
-            },
-        ],
-    },
-    {
-        id: "4",
-        orderNumber: "#ORD-3018",
-        customerName: "Rizky Ananda",
-        orderDate: "16 Apr 2026",
-        paymentMethod: "COD",
-        paymentStatus: "Unpaid",
-        status: "Declined",
-        declineReason:
-            "Alamat pengiriman tidak lengkap dan customer belum memberikan konfirmasi tambahan.",
-        paymentProofImage: null,
-        customer: {
-            firstName: "Rizky",
-            lastName: "Ananda",
-            address: "Jl. Cemara Hijau No. 12",
-            city: "Semarang",
-            postalCode: "50141",
-        },
-        items: [
-            {
-                id: "i5",
-                productName: "Auralux Studio Max",
-                productImage:
-                    "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1080",
-                quantity: 2,
-                unitPrice: 3299000,
-            },
-        ],
-    },
-    {
-        id: "5",
-        orderNumber: "#ORD-3017",
-        customerName: "Dinda Safira",
-        orderDate: "15 Apr 2026",
-        paymentMethod: "Bank Transfer",
-        paymentStatus: "Unpaid",
-        status: "Cancelled",
-        declineReason: null,
-        paymentProofImage: null,
-        customer: {
-            firstName: "Dinda",
-            lastName: "Safira",
-            address: "Cluster Anggrek Residence A2",
-            city: "Jakarta",
-            postalCode: "11730",
-        },
-        items: [
-            {
-                id: "i6",
-                productName: "NexaBook Pro 16",
-                productImage:
-                    "https://images.unsplash.com/photo-1658262530868-f7460e2f071f?q=80&w=1080",
-                quantity: 1,
-                unitPrice: 14999000,
-            },
-        ],
-    },
-];
+function normalizeOrder(item: OrderData): OrderItemData {
+    return {
+        id: item.id,
+        orderNumber: item.orderNumber,
+        customerName: item.customerName,
+        orderDate: item.orderDate ?? "-",
+        paymentMethod: item.paymentMethod as OrderItemData["paymentMethod"],
+        paymentStatus: item.paymentStatus as OrderItemData["paymentStatus"],
+        status: item.status as OrderItemData["status"],
+        declineReason: item.declineReason,
+        paymentProofImage: item.paymentProofImage,
+        customer: item.customer,
+        items: item.items.map((orderItem) => ({
+            id: orderItem.id,
+            productName: orderItem.productName,
+            productImage: orderItem.productImage,
+            quantity: orderItem.quantity,
+            unitPrice: orderItem.unitPrice,
+        })),
+    };
+}
 
 export default function OrderPage() {
-    const [orders, setOrders] = useState<OrderItemData[]>(initialOrders);
+    const [orders, setOrders] = useState<OrderItemData[]>([]);
+    const [summary, setSummary] = useState({
+        paidOrders: 0,
+        totalOrders: 0,
+        deliveredOrders: 0,
+        progressingOrders: 0,
+        orderValue: 0,
+    });
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStatus, setSelectedStatus] = useState("Semua Status");
+
+    const loadOrders = async () => {
+        try {
+            const response = await fetchAdminOrders();
+            setOrders(response.data.map(normalizeOrder));
+            setSummary(response.summary);
+        } catch {
+            setOrders([]);
+            setSummary({
+                paidOrders: 0,
+                totalOrders: 0,
+                deliveredOrders: 0,
+                progressingOrders: 0,
+                orderValue: 0,
+            });
+        }
+    };
+
+    useEffect(() => {
+        void loadOrders();
+    }, []);
 
     const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
@@ -187,38 +84,36 @@ export default function OrderPage() {
         });
     }, [orders, searchQuery, selectedStatus]);
 
-    const deliveredOrders = useMemo(
-        () => orders.filter((order) => order.status === "Delivered").length,
-        [orders],
-    );
-
-    const progressingOrders = useMemo(
-        () => orders.filter((order) => order.status === "Progressing").length,
-        [orders],
-    );
-
-    const paidOrders = useMemo(
-        () => orders.filter((order) => order.paymentStatus === "Paid").length,
-        [orders],
-    );
-
-    const orderValue = useMemo(
-        () =>
-            orders.reduce((sum, order) => sum + getOrderTotal(order.items), 0),
-        [orders],
-    );
-
-    const handleUpdateOrder = (
+    const handleUpdateOrder = async (
         orderId: string,
         updates: Partial<
             Pick<OrderItemData, "status" | "paymentStatus" | "declineReason">
         >,
     ) => {
-        setOrders((prev) =>
-            prev.map((order) =>
-                order.id === orderId ? { ...order, ...updates } : order,
-            ),
-        );
+        if (!updates.status) {
+            return;
+        }
+
+        const statusKey = {
+            Progressing: "progressing",
+            Delivered: "delivered",
+            Declined: "declined",
+            Cancelled: "cancelled",
+        }[updates.status] as "progressing" | "delivered" | "declined" | "cancelled";
+
+        try {
+            await updateAdminOrder(orderId, {
+                status: statusKey,
+                decline_reason: updates.declineReason ?? null,
+            });
+            await loadOrders();
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Gagal memperbarui order.",
+            );
+        }
     };
 
     return (
@@ -241,9 +136,9 @@ export default function OrderPage() {
                                 </h1>
                             </div>
                             <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Pantau pesanan customer, verifikasi pembayaran,
-                                dan kelola status order dengan tampilan yang lebih
-                                lega, rapi, dan nyaman dilihat.
+                                Semua order sekarang dibaca langsung dari database,
+                                termasuk payment proof, status pembayaran, dan
+                                produk yang dipesan.
                             </p>
                         </div>
                     </div>
@@ -256,7 +151,7 @@ export default function OrderPage() {
                                         Paid Orders
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
-                                        {paidOrders}
+                                        {summary.paidOrders}
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -272,7 +167,7 @@ export default function OrderPage() {
                                         Order Summary
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold">
-                                        {orders.length} orders
+                                        {summary.totalOrders} orders
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-blue-200">
@@ -280,7 +175,8 @@ export default function OrderPage() {
                                 </div>
                             </div>
                             <p className="mt-3 text-xs text-slate-300">
-                                {progressingOrders} progressing, {deliveredOrders} delivered
+                                {summary.progressingOrders} progressing,{" "}
+                                {summary.deliveredOrders} delivered
                             </p>
                         </div>
                     </div>
@@ -300,7 +196,7 @@ export default function OrderPage() {
                                         Total Value
                                     </p>
                                     <p className="mt-1 text-lg font-semibold text-slate-950">
-                                        Rp {orderValue.toLocaleString("id-ID")}
+                                        Rp {summary.orderValue.toLocaleString("id-ID")}
                                     </p>
                                 </div>
                             </div>
@@ -311,7 +207,7 @@ export default function OrderPage() {
                                 Delivered
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">
-                                {deliveredOrders}
+                                {summary.deliveredOrders}
                             </p>
                         </div>
 
@@ -320,7 +216,7 @@ export default function OrderPage() {
                                 Progressing
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">
-                                {progressingOrders}
+                                {summary.progressingOrders}
                             </p>
                         </div>
                     </div>

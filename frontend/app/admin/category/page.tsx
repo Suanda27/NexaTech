@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     FolderPlus,
     Layers3,
@@ -12,45 +12,37 @@ import AddCategoryModal from "./components/AddCategoryModal";
 import EditCategoryModal from "./components/EditCategoryModal";
 import DeleteCategoryModal from "./components/DeleteCategoryModal";
 import type { CategoryItem, CategoryStatus } from "./types";
+import {
+    createAdminCategory,
+    deleteAdminCategory,
+    fetchAdminCategories,
+    updateAdminCategory,
+} from "@/lib/store";
 
-const initialCategories: CategoryItem[] = [
-    {
-        id: 1,
-        name: "Elektronik",
-        totalProducts: 128,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=600",
-    },
-    {
-        id: 2,
-        name: "Fashion",
-        totalProducts: 86,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=600",
-    },
-    {
-        id: 3,
-        name: "Home Office",
-        totalProducts: 42,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1497366754035-f200968a6e72?q=80&w=600",
-    },
-    {
-        id: 4,
-        name: "Audio Premium",
-        totalProducts: 18,
-        status: "Inactive",
-        imageUrl:
-            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=600",
-    },
-];
+function normalizeCategory(item: {
+    id: number;
+    name: string;
+    totalProducts: number;
+    status: "Active" | "Inactive";
+    imageUrl: string | null;
+}): CategoryItem {
+    return {
+        id: item.id,
+        name: item.name,
+        totalProducts: item.totalProducts,
+        status: item.status,
+        imageUrl: item.imageUrl,
+    };
+}
 
 export default function CategoryPage() {
-    const [categories, setCategories] =
-        useState<CategoryItem[]>(initialCategories);
+    const [categories, setCategories] = useState<CategoryItem[]>([]);
+    const [summary, setSummary] = useState({
+        totalCategories: 0,
+        totalProducts: 0,
+        activeCategories: 0,
+        inactiveCategories: 0,
+    });
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(
         null,
@@ -58,23 +50,34 @@ export default function CategoryPage() {
     const [deletingCategory, setDeletingCategory] =
         useState<CategoryItem | null>(null);
 
-    const totalProducts = useMemo(
-        () =>
-            categories.reduce(
-                (sum, category) => sum + category.totalProducts,
-                0,
-            ),
-        [categories],
+    const loadCategories = async () => {
+        try {
+            const response = await fetchAdminCategories();
+            setCategories(response.data.map(normalizeCategory));
+            setSummary(response.summary);
+        } catch {
+            setCategories([]);
+            setSummary({
+                totalCategories: 0,
+                totalProducts: 0,
+                activeCategories: 0,
+                inactiveCategories: 0,
+            });
+        }
+    };
+
+    useEffect(() => {
+        void loadCategories();
+    }, []);
+
+    const totalProducts = useMemo(() => summary.totalProducts, [summary]);
+    const activeCategories = useMemo(() => summary.activeCategories, [summary]);
+    const inactiveCategories = useMemo(
+        () => summary.inactiveCategories,
+        [summary],
     );
 
-    const activeCategories = useMemo(
-        () => categories.filter((category) => category.status === "Active").length,
-        [categories],
-    );
-
-    const inactiveCategories = categories.length - activeCategories;
-
-    const handleAddCategory = ({
+    const handleAddCategory = async ({
         name,
         status,
         imageUrl,
@@ -83,23 +86,24 @@ export default function CategoryPage() {
         status: CategoryStatus;
         imageUrl: string | null;
     }) => {
-        setCategories((prev) => [
-            {
-                id:
-                    prev.length > 0
-                        ? Math.max(...prev.map((category) => category.id)) + 1
-                        : 1,
+        try {
+            await createAdminCategory({
                 name,
-                status,
-                totalProducts: 0,
-                imageUrl,
-            },
-            ...prev,
-        ]);
-        setIsAddOpen(false);
+                image_url: imageUrl,
+                status: status === "Active" ? "active" : "inactive",
+            });
+            setIsAddOpen(false);
+            await loadCategories();
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Gagal menambahkan kategori.",
+            );
+        }
     };
 
-    const handleUpdateCategory = ({
+    const handleUpdateCategory = async ({
         id,
         name,
         status,
@@ -110,25 +114,39 @@ export default function CategoryPage() {
         status: CategoryStatus;
         imageUrl: string | null;
     }) => {
-        setCategories((prev) =>
-            prev.map((category) =>
-                category.id === id
-                    ? { ...category, name, status, imageUrl }
-                    : category,
-            ),
-        );
-        setEditingCategory(null);
+        try {
+            await updateAdminCategory(id, {
+                name,
+                image_url: imageUrl,
+                status: status === "Active" ? "active" : "inactive",
+            });
+            setEditingCategory(null);
+            await loadCategories();
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Gagal memperbarui kategori.",
+            );
+        }
     };
 
-    const handleDeleteCategory = () => {
+    const handleDeleteCategory = async () => {
         if (!deletingCategory) {
             return;
         }
 
-        setCategories((prev) =>
-            prev.filter((category) => category.id !== deletingCategory.id),
-        );
-        setDeletingCategory(null);
+        try {
+            await deleteAdminCategory(deletingCategory.id);
+            setDeletingCategory(null);
+            await loadCategories();
+        } catch (error) {
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "Gagal menghapus kategori.",
+            );
+        }
     };
 
     return (
@@ -151,9 +169,9 @@ export default function CategoryPage() {
                                 </h1>
                             </div>
                             <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Susun kategori utama, kelola status aktifnya,
-                                dan jaga pengalaman browsing produk tetap
-                                terarah.
+                                Semua kategori sekarang mengikuti database dan
+                                CRUD API admin, jadi perubahan dari panel ini
+                                langsung memengaruhi katalog customer.
                             </p>
                         </div>
 
@@ -175,7 +193,7 @@ export default function CategoryPage() {
                                         Total Categories
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
-                                        {categories.length}
+                                        {summary.totalCategories}
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">

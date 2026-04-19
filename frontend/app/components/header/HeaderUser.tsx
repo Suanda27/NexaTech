@@ -12,12 +12,14 @@ import {
     User,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useShop } from "@/context/ShopContext";
 
 export default function HeaderUser() {
     const [menuOpen, setMenuOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement | null>(null);
     const router = useRouter();
     const { user, logout } = useAuth();
+    const { cartCount, setCartCount } = useShop();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -37,6 +39,7 @@ export default function HeaderUser() {
 
     const handleLogout = async () => {
         await logout();
+        setCartCount(0);
         setMenuOpen(false);
         router.replace("/customer/login");
     };
@@ -87,7 +90,7 @@ export default function HeaderUser() {
                         <ShoppingCart className="text-gray-700" size={22} />
 
                         <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
-                            3
+                            {cartCount}
                         </span>
                     </Link>
 

@@ -6,8 +6,8 @@ import { ArrowUpRight } from "lucide-react";
 type StatsCardProps = {
     title: string;
     value: string;
-    change: string;
-    note: string;
+    change?: string;
+    note?: string;
     icon: LucideIcon;
 };
 
@@ -31,13 +31,21 @@ export default function StatsCard({
                         </h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                            {change}
-                        </span>
-                        <span className="text-xs text-slate-500">{note}</span>
-                    </div>
+                    {(change || note) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {change && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+                                    <ArrowUpRight className="h-3.5 w-3.5" />
+                                    {change}
+                                </span>
+                            )}
+                            {note && (
+                                <span className="text-xs text-slate-500">
+                                    {note}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-200 transition duration-300 group-hover:scale-105">

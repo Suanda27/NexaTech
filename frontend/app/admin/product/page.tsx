@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     Boxes,
     CircleDollarSign,
@@ -12,174 +12,77 @@ import ProductTable from "./ProductTable";
 import AddProductModal from "./components/AddProductModal";
 import EditProductModal from "./components/EditProductModal";
 import DeleteProductModal from "./components/DeleteProductModal";
-import type { ProductFormValues, ProductItem } from "./types";
-import { createSpec, formatPrice } from "./utils";
+import type {
+    ProductFormValues,
+    ProductItem,
+    SpecIconKey,
+} from "./types";
+import { formatPrice } from "./utils";
+import {
+    createAdminProduct,
+    deleteAdminProduct,
+    fetchAdminCategories,
+    fetchAdminProducts,
+    updateAdminProduct,
+} from "@/lib/store";
 
-const initialProducts: ProductItem[] = [
-    {
-        id: 1,
-        name: "NexaBook Pro 16",
-        sku: "PRD-2401",
-        category: "Elektronik",
-        price: 14999000,
-        rating: 5,
-        description:
-            "Laptop premium untuk creator dan power user dengan layar 16 inci, performa tinggi, dan desain minimal modern.",
-        stock: 24,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1658262530868-f7460e2f071f?q=80&w=1080",
-        specs: [
-            createSpec(
-                "Display",
-                "16-inch Retina 120Hz",
-                "display",
-                "Panel tajam dengan warna kaya untuk editing, desain, dan entertainment.",
-            ),
-            createSpec(
-                "Memory",
-                "32GB Unified Memory",
-                "performance",
-                "Multitasking lebih stabil untuk project berat sepanjang hari.",
-            ),
-            createSpec(
-                "Storage",
-                "1TB SSD Storage",
-                "storage",
-                "Akses file super cepat dan ruang kerja lega untuk asset besar.",
-            ),
-            createSpec(
-                "Processor",
-                "12-Core CPU",
-                "processor",
-                "Performa kencang untuk render, coding, dan workflow produktif.",
-            ),
-        ],
-    },
-    {
-        id: 2,
-        name: "Auralux Studio Max",
-        sku: "PRD-2402",
-        category: "Audio Premium",
-        price: 3299000,
-        rating: 4,
-        description:
-            "Headphone wireless dengan tuning detail, noise cancellation adaptif, dan finishing premium untuk kerja fokus.",
-        stock: 14,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1080",
-        specs: [
-            createSpec(
-                "Audio Driver",
-                "40mm Dynamic Driver",
-                "audio",
-                "Karakter suara kaya detail dengan bass tetap terkontrol.",
-            ),
-            createSpec(
-                "Battery",
-                "42 Hours Playback",
-                "battery",
-                "Dipakai seharian tanpa khawatir cepat habis.",
-            ),
-            createSpec(
-                "Noise Control",
-                "Adaptive ANC",
-                "security",
-                "Menyaring gangguan sekitar untuk ruang dengar yang lebih tenang.",
-            ),
-            createSpec(
-                "Connectivity",
-                "Bluetooth 5.3",
-                "performance",
-                "Koneksi stabil dengan latensi rendah saat kerja maupun hiburan.",
-            ),
-        ],
-    },
-    {
-        id: 3,
-        name: "VisionPad Ultra",
-        sku: "PRD-2403",
-        category: "Smart Devices",
-        price: 8799000,
-        rating: 4,
-        description:
-            "Tablet tipis dengan layar tajam dan stylus support, cocok untuk presentasi, desain, dan catatan digital.",
-        stock: 9,
-        status: "Active",
-        imageUrl:
-            "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=1080",
-        specs: [
-            createSpec(
-                "Display",
-                "12.9-inch Liquid Screen",
-                "display",
-                "Visual lebar dengan warna akurat untuk membaca dan membuat.",
-            ),
-            createSpec(
-                "Camera",
-                "12MP Ultra Wide",
-                "camera",
-                "Video call dan scanning dokumen lebih jelas.",
-            ),
-            createSpec(
-                "Battery",
-                "All-day Battery",
-                "battery",
-                "Didesain untuk mobilitas tanpa sering isi ulang.",
-            ),
-            createSpec(
-                "Performance",
-                "AI Productivity Chip",
-                "performance",
-                "Respons cepat untuk multitasking ringan hingga menengah.",
-            ),
-        ],
-    },
-    {
-        id: 4,
-        name: "Orbit Dock Prime",
-        sku: "PRD-2404",
-        category: "Home Office",
-        price: 1899000,
-        rating: 4,
-        description:
-            "Docking station ringkas untuk setup meja kerja yang lebih bersih dengan port lengkap dan charging cepat.",
-        stock: 0,
-        status: "Out of Stock",
-        imageUrl:
-            "https://images.unsplash.com/photo-1625842268584-8f3296236761?q=80&w=1080",
-        specs: [
-            createSpec(
-                "Ports",
-                "8-in-1 Expansion",
-                "storage",
-                "Lengkap untuk monitor, data transfer, ethernet, dan charging.",
-            ),
-            createSpec(
-                "Output",
-                "Dual 4K Display",
-                "display",
-                "Mendukung workflow multi-screen yang lebih rapi.",
-            ),
-            createSpec(
-                "Charging",
-                "100W Power Delivery",
-                "battery",
-                "Menyalurkan daya tinggi untuk laptop kerja modern.",
-            ),
-            createSpec(
-                "Build",
-                "Aluminum Finish",
-                "security",
-                "Tampil premium dan membantu pelepasan panas lebih stabil.",
-            ),
-        ],
-    },
-];
+type CategoryLookup = {
+    id: number;
+    name: string;
+};
+
+function normalizeProduct(item: {
+    id: number;
+    categoryId: number | null;
+    category: string;
+    sku: string;
+    name: string;
+    price: number;
+    rating: number;
+    description: string;
+    stock: number;
+    status: string;
+    imageUrl: string | null;
+    specs?: Array<{
+        id: string;
+        label: string;
+        value: string;
+        description: string;
+        icon: string;
+    }>;
+}): ProductItem {
+    return {
+        id: item.id,
+        categoryId: item.categoryId,
+        category: item.category,
+        sku: item.sku,
+        name: item.name,
+        price: item.price,
+        rating: item.rating,
+        description: item.description,
+        stock: item.stock,
+        status: item.status as ProductItem["status"],
+        imageUrl: item.imageUrl,
+        specs:
+            item.specs?.map((spec) => ({
+                id: spec.id,
+                label: spec.label,
+                value: spec.value,
+                description: spec.description,
+                icon: spec.icon as SpecIconKey,
+            })) ?? [],
+    };
+}
 
 export default function ProductPage() {
-    const [products, setProducts] = useState<ProductItem[]>(initialProducts);
+    const [products, setProducts] = useState<ProductItem[]>([]);
+    const [categoryLookup, setCategoryLookup] = useState<CategoryLookup[]>([]);
+    const [summary, setSummary] = useState({
+        totalProducts: 0,
+        totalInventoryValue: 0,
+        totalStock: 0,
+        activeProducts: 0,
+    });
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("Semua Kategori");
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -187,9 +90,40 @@ export default function ProductPage() {
     const [deletingProduct, setDeletingProduct] =
         useState<ProductItem | null>(null);
 
+    const loadData = async () => {
+        try {
+            const [productsResponse, categoriesResponse] = await Promise.all([
+                fetchAdminProducts(),
+                fetchAdminCategories(),
+            ]);
+
+            setProducts(productsResponse.data.map(normalizeProduct));
+            setSummary(productsResponse.summary);
+            setCategoryLookup(
+                categoriesResponse.data.map((category) => ({
+                    id: category.id,
+                    name: category.name,
+                })),
+            );
+        } catch {
+            setProducts([]);
+            setCategoryLookup([]);
+            setSummary({
+                totalProducts: 0,
+                totalInventoryValue: 0,
+                totalStock: 0,
+                activeProducts: 0,
+            });
+        }
+    };
+
+    useEffect(() => {
+        void loadData();
+    }, []);
+
     const categories = useMemo(
-        () => Array.from(new Set(products.map((product) => product.category))).sort(),
-        [products],
+        () => categoryLookup.map((category) => category.name),
+        [categoryLookup],
     );
 
     const filteredProducts = useMemo(() => {
@@ -210,82 +144,100 @@ export default function ProductPage() {
     }, [products, searchQuery, selectedCategory]);
 
     const totalInventoryValue = useMemo(
-        () =>
-            products.reduce(
-                (sum, product) => sum + product.price * product.stock,
-                0,
-            ),
-        [products],
+        () => summary.totalInventoryValue,
+        [summary],
     );
+    const totalStock = useMemo(() => summary.totalStock, [summary]);
+    const activeProducts = useMemo(() => summary.activeProducts, [summary]);
 
-    const totalStock = useMemo(
-        () => products.reduce((sum, product) => sum + product.stock, 0),
-        [products],
-    );
+    const resolveCategoryId = (categoryName: string) =>
+        categoryLookup.find((category) => category.name === categoryName)?.id ?? null;
 
-    const activeProducts = useMemo(
-        () => products.filter((product) => product.status === "Active").length,
-        [products],
-    );
-
-    const normalizeStatus = (
-        status: ProductFormValues["status"],
-        stock: number,
-    ): ProductFormValues["status"] => {
-        if (stock === 0) {
-            return "Out of Stock";
+    const mapStatusToApi = (status: ProductFormValues["status"]) => {
+        switch (status) {
+            case "Inactive":
+                return "inactive" as const;
+            case "Out of Stock":
+                return "out_of_stock" as const;
+            default:
+                return "active" as const;
         }
-
-        if (status === "Out of Stock") {
-            return "Inactive";
-        }
-
-        return status;
     };
 
-    const handleAddProduct = (payload: ProductFormValues) => {
-        setProducts((prev) => [
-            {
-                id:
-                    prev.length > 0
-                        ? Math.max(...prev.map((product) => product.id)) + 1
-                        : 1,
-                ...payload,
-                status: normalizeStatus(payload.status, payload.stock),
-            },
-            ...prev,
-        ]);
-        setIsAddOpen(false);
+    const handleAddProduct = async (payload: ProductFormValues) => {
+        try {
+            await createAdminProduct({
+                category_id: resolveCategoryId(payload.category),
+                sku: payload.sku,
+                name: payload.name,
+                description: payload.description,
+                price: payload.price,
+                stock: payload.stock,
+                status: mapStatusToApi(payload.status),
+                rating: payload.rating,
+                image_url: payload.imageUrl,
+                specs: payload.specs.map((spec) => ({
+                    label: spec.label,
+                    value: spec.value,
+                    description: spec.description,
+                    icon: spec.icon,
+                })),
+            });
+            setIsAddOpen(false);
+            await loadData();
+        } catch (error) {
+            alert(
+                error instanceof Error ? error.message : "Gagal menambahkan produk.",
+            );
+        }
     };
 
-    const handleUpdateProduct = (payload: ProductFormValues) => {
+    const handleUpdateProduct = async (payload: ProductFormValues) => {
         if (!editingProduct) {
             return;
         }
 
-        setProducts((prev) =>
-            prev.map((product) =>
-                product.id === editingProduct.id
-                    ? {
-                          ...product,
-                          ...payload,
-                          status: normalizeStatus(payload.status, payload.stock),
-                      }
-                    : product,
-            ),
-        );
-        setEditingProduct(null);
+        try {
+            await updateAdminProduct(editingProduct.id, {
+                category_id: resolveCategoryId(payload.category),
+                sku: payload.sku,
+                name: payload.name,
+                description: payload.description,
+                price: payload.price,
+                stock: payload.stock,
+                status: mapStatusToApi(payload.status),
+                rating: payload.rating,
+                image_url: payload.imageUrl,
+                specs: payload.specs.map((spec) => ({
+                    label: spec.label,
+                    value: spec.value,
+                    description: spec.description,
+                    icon: spec.icon,
+                })),
+            });
+            setEditingProduct(null);
+            await loadData();
+        } catch (error) {
+            alert(
+                error instanceof Error ? error.message : "Gagal memperbarui produk.",
+            );
+        }
     };
 
-    const handleDeleteProduct = () => {
+    const handleDeleteProduct = async () => {
         if (!deletingProduct) {
             return;
         }
 
-        setProducts((prev) =>
-            prev.filter((product) => product.id !== deletingProduct.id),
-        );
-        setDeletingProduct(null);
+        try {
+            await deleteAdminProduct(deletingProduct.id);
+            setDeletingProduct(null);
+            await loadData();
+        } catch (error) {
+            alert(
+                error instanceof Error ? error.message : "Gagal menghapus produk.",
+            );
+        }
     };
 
     return (
@@ -308,9 +260,9 @@ export default function ProductPage() {
                                 </h1>
                             </div>
                             <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Kelola produk, harga, stok, dan key specification
-                                dengan tampilan yang lebih rapi untuk admin dan
-                                pengalaman detail produk yang tetap konsisten.
+                                Semua produk, gambar, stok, dan key specification
+                                sekarang disimpan lewat backend, jadi admin dan
+                                customer membaca sumber data yang sama.
                             </p>
                         </div>
 
@@ -332,7 +284,7 @@ export default function ProductPage() {
                                         Total Products
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
-                                        {products.length}
+                                        {summary.totalProducts}
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">

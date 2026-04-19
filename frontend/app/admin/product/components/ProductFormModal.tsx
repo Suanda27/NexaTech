@@ -71,14 +71,8 @@ export default function ProductFormModal({
     const [isUploading, setIsUploading] = useState(false);
 
     const suggestedCategories = useMemo(
-        () => [
-            "Elektronik",
-            "Gaming Setup",
-            "Home Office",
-            "Audio Premium",
-            "Smart Devices",
-        ],
-        [],
+        () => categories.filter(Boolean),
+        [categories],
     );
 
     useEffect(() => {

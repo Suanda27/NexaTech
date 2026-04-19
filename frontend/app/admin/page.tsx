@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ArrowUpRight,
     Boxes,
@@ -13,9 +13,12 @@ import StatsCard from "./components/StatsCard";
 import SalesChart from "./components/SalesChart";
 import ProductTable from "./components/ProductTable";
 import { useAuth } from "@/context/AuthContext";
+import { fetchAdminDashboard, type AdminDashboardResponse } from "@/lib/store";
 
 export default function DashboardPage() {
     const { user } = useAuth();
+    const [dashboard, setDashboard] =
+        useState<AdminDashboardResponse["data"] | null>(null);
 
     const todayLabel = useMemo(
         () =>
@@ -27,6 +30,39 @@ export default function DashboardPage() {
             }).format(new Date()),
         [],
     );
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadDashboard = async () => {
+            try {
+                const response = await fetchAdminDashboard();
+
+                if (mounted) {
+                    setDashboard(response.data);
+                }
+            } catch {
+                if (mounted) {
+                    setDashboard({
+                        stats: {
+                            totalRevenue: 0,
+                            totalOrders: 0,
+                            totalProducts: 0,
+                            fulfillmentRate: 0,
+                        },
+                        chart: [],
+                        topProducts: [],
+                    });
+                }
+            }
+        };
+
+        void loadDashboard();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     return (
         <>
@@ -61,19 +97,24 @@ export default function DashboardPage() {
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                            Conversion
-                                        </p>
-                                        <p className="mt-1 text-2xl font-semibold text-slate-950">
-                                            6.84%
-                                        </p>
-                                    </div>
+                                        Conversion
+                                    </p>
+                                    <p className="mt-1 text-2xl font-semibold text-slate-950">
+                                            {dashboard?.stats.totalOrders
+                                                ? `${Math.min(
+                                                      dashboard.stats.fulfillmentRate,
+                                                      100,
+                                                  ).toFixed(1)}%`
+                                                : "0%"}
+                                    </p>
+                                </div>
                                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
                                         <ChartNoAxesCombined className="h-5 w-5" />
                                     </div>
                                 </div>
                                 <p className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
                                     <ArrowUpRight className="h-3.5 w-3.5" />
-                                    +1.12% from last month
+                                    Live sync from orders
                                 </p>
                             </div>
 
@@ -84,7 +125,7 @@ export default function DashboardPage() {
                                 <div className="mt-3 flex items-end justify-between gap-4">
                                     <div>
                                         <p className="text-2xl font-semibold">
-                                            94.2%
+                                            {(dashboard?.stats.fulfillmentRate ?? 0).toFixed(1)}%
                                         </p>
                                         <p className="mt-1 text-xs text-slate-300">
                                             Orders processed on time
@@ -102,23 +143,20 @@ export default function DashboardPage() {
                 <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <StatsCard
                         title="Total Penjualan"
-                        value="Rp 245M"
-                        change="+12.4%"
-                        note="vs last month"
+                        value={`Rp ${(dashboard?.stats.totalRevenue ?? 0).toLocaleString("id-ID")}`}
+                        note="from delivered orders"
                         icon={ChartNoAxesCombined}
                     />
                     <StatsCard
                         title="Total Order"
-                        value="1,284"
-                        change="+8.1%"
-                        note="healthy order volume"
+                        value={(dashboard?.stats.totalOrders ?? 0).toLocaleString("id-ID")}
+                        note="current backend total"
                         icon={ClipboardList}
                     />
                     <StatsCard
                         title="Total Produk"
-                        value="356"
-                        change="+24"
-                        note="new active items"
+                        value={(dashboard?.stats.totalProducts ?? 0).toLocaleString("id-ID")}
+                        note="active catalog source"
                         icon={Boxes}
                     />
                 </section>
@@ -139,7 +177,11 @@ export default function DashboardPage() {
                                 months.
                             </p>
                         </div>
-                        <SalesChart />
+                        <SalesChart
+                            data={dashboard?.chart ?? []}
+                            totalRevenue={dashboard?.stats.totalRevenue ?? 0}
+                            totalOrders={dashboard?.stats.totalOrders ?? 0}
+                        />
                     </div>
 
                     <div className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 shadow-[0_20px_50px_-38px_rgba(37,99,235,0.65)] sm:p-6">
@@ -156,7 +198,7 @@ export default function DashboardPage() {
                                 Updated today
                             </span>
                         </div>
-                        <ProductTable />
+                        <ProductTable products={dashboard?.topProducts ?? []} />
                     </div>
                 </section>
             </div>

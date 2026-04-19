@@ -11,14 +11,15 @@ import {
     YAxis,
 } from "recharts";
 
-const data = [
-    { month: "Jan", revenue: 165, orders: 840 },
-    { month: "Feb", revenue: 182, orders: 915 },
-    { month: "Mar", revenue: 205, orders: 1010 },
-    { month: "Apr", revenue: 214, orders: 1096 },
-    { month: "May", revenue: 238, orders: 1184 },
-    { month: "Jun", revenue: 245, orders: 1284 },
-];
+type SalesChartProps = {
+    data: Array<{
+        label: string;
+        revenue: number;
+        orders: number;
+    }>;
+    totalRevenue: number;
+    totalOrders: number;
+};
 
 function CustomTooltip({
     active,
@@ -54,7 +55,7 @@ function CustomTooltip({
                         </span>
                         <span className="font-semibold text-slate-900">
                             {entry.name === "Revenue"
-                                ? `Rp ${entry.value}M`
+                                ? `Rp ${entry.value.toLocaleString("id-ID")}`
                                 : `${entry.value} orders`}
                         </span>
                     </div>
@@ -64,7 +65,11 @@ function CustomTooltip({
     );
 }
 
-export default function SalesChart() {
+export default function SalesChart({
+    data,
+    totalRevenue,
+    totalOrders,
+}: SalesChartProps) {
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap gap-3">
@@ -73,7 +78,7 @@ export default function SalesChart() {
                         Revenue
                     </p>
                     <p className="mt-1 text-lg font-semibold text-slate-950">
-                        Rp 245M
+                        Rp {totalRevenue.toLocaleString("id-ID")}
                     </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -81,7 +86,7 @@ export default function SalesChart() {
                         Orders
                     </p>
                     <p className="mt-1 text-lg font-semibold text-slate-950">
-                        1,284
+                        {totalOrders.toLocaleString("id-ID")}
                     </p>
                 </div>
             </div>
@@ -108,7 +113,7 @@ export default function SalesChart() {
                             vertical={false}
                         />
                         <XAxis
-                            dataKey="month"
+                            dataKey="label"
                             axisLine={false}
                             tickLine={false}
                             tickMargin={10}
@@ -120,7 +125,7 @@ export default function SalesChart() {
                             tickLine={false}
                             tickMargin={10}
                             tick={{ fill: "#64748b", fontSize: 12 }}
-                            tickFormatter={(value) => `${value}M`}
+                            tickFormatter={(value) => `${Number(value) / 1000000}M`}
                         />
                         <YAxis
                             yAxisId="right"

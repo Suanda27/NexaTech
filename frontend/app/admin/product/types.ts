@@ -22,6 +22,7 @@ export type ProductSpec = {
 
 export type ProductItem = {
     id: number;
+    categoryId?: number | null;
     name: string;
     sku: string;
     category: string;

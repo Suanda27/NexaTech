@@ -57,6 +57,27 @@ export async function authFetch(
     });
 }
 
+export async function fetchJson<T>(
+    path: string,
+    init: RequestInit = {},
+): Promise<T> {
+    const response = await authFetch(path, init);
+    const data = (await response.json()) as T & {
+        message?: string;
+        errors?: Record<string, string[]>;
+    };
+
+    if (!response.ok) {
+        throw new Error(
+            data.message ??
+                Object.values(data.errors ?? {})[0]?.[0] ??
+                "Request gagal",
+        );
+    }
+
+    return data;
+}
+
 export function buildRedirectPath(pathname: string, search?: string): string {
     return `${pathname}${search && search !== "?" ? search : ""}`;
 }
