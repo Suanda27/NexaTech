@@ -1,120 +1,135 @@
 "use client";
 
-import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import EditCategoryModal from "./components/EditCategoryModal";
-import DeleteCategoryModal from "./components/DeleteCategoryModal";
+import {
+    FolderPlus,
+    PencilLine,
+    Trash2,
+} from "lucide-react";
+import type { CategoryItem } from "./types";
 
-export default function CategoryTable() {
-  const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selected, setSelected] = useState<any>(null);
+type CategoryTableProps = {
+    categories: CategoryItem[];
+    onAdd: () => void;
+    onEdit: (category: CategoryItem) => void;
+    onDelete: (category: CategoryItem) => void;
+};
 
-  const data = [
-    { name: "Elektronik", total: 128, status: "Active" },
-    { name: "Fashion", total: 86, status: "Active" },
-    { name: "Makanan & Minuman", total: 54, status: "Inactive" },
-    { name: "Peralatan Rumah", total: 37, status: "Active" },
-  ];
+export default function CategoryTable({
+    categories,
+    onAdd,
+    onEdit,
+    onDelete,
+}: CategoryTableProps) {
+    if (categories.length === 0) {
+        return (
+            <div className="rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                    <FolderPlus className="h-6 w-6" />
+                </div>
+                <h3 className="mt-5 text-xl font-semibold text-slate-950">
+                    Silahkan tambahkan kategori
+                </h3>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    Belum ada kategori yang tersimpan. Tambahkan kategori baru
+                    untuk mulai mengelompokkan produk dengan lebih rapi.
+                </p>
+                <button
+                    type="button"
+                    onClick={onAdd}
+                    className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+                >
+                    <FolderPlus className="h-4 w-4" />
+                    Tambahkan Kategori
+                </button>
+            </div>
+        );
+    }
 
-  return (
-    <>
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-gray-200">
-        <table className="min-w-full text-sm">
+    return (
+        <div className="overflow-hidden rounded-lg border border-blue-100">
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                    <thead className="bg-blue-50">
+                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                            <th className="px-6 py-4">Nama Kategori</th>
+                            <th className="px-6 py-4">Jumlah Produk</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Aksi</th>
+                        </tr>
+                    </thead>
 
-          {/* Head */}
-          <thead className="bg-gradient-to-r from-blue-100 to-indigo-100">
-            <tr className="text-gray-700 text-xs uppercase tracking-wide font-semibold">
-              <th className="text-left px-6 py-4">Nama Kategori</th>
-              <th className="text-left px-6 py-4">Jumlah Produk</th>
-              <th className="text-left px-6 py-4">Status</th>
-              <th className="text-left px-6 py-4">Aksi</th>
-            </tr>
-          </thead>
-
-          {/* Body */}
-          <tbody>
-            {data.map((item, index) => (
-              <tr
-                key={index}
-                className="border-t hover:bg-gray-50 transition duration-150"
-              >
-                {/* Nama */}
-                <td className="px-6 py-4 font-medium text-gray-800">
-                  {item.name}
-                </td>
-
-                {/* Jumlah */}
-                <td className="px-6 py-4 text-gray-600">
-                  {item.total}
-                </td>
-
-                {/* Status */}
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs rounded-full font-medium ${
-                      item.status === "Active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-600"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </td>
-
-                {/* Aksi */}
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-
-                    {/* Edit */}
-                    <button
-                      onClick={() => {
-                        setSelected(item);
-                        setEditOpen(true);
-                      }}
-                      className="p-2 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600 transition duration-150 active:scale-95"
-                      title="Edit"
-                    >
-                      <Pencil size={16} />
-                    </button>
-
-                    {/* Delete */}
-                    <button
-                      onClick={() => {
-                        setSelected(item);
-                        setDeleteOpen(true);
-                      }}
-                      className="p-2 rounded-md bg-red-50 hover:bg-red-100 text-red-500 transition duration-150 active:scale-95"
-                      title="Hapus"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal Edit */}
-      <EditCategoryModal
-        isOpen={editOpen}
-        onClose={() => setEditOpen(false)}
-        category={selected}
-      />
-
-      {/* Modal Delete */}
-      <DeleteCategoryModal
-        isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={() => {
-          console.log("Hapus:", selected);
-          setDeleteOpen(false);
-        }}
-        category={selected}
-      />
-    </>
-  );
+                    <tbody>
+                        {categories.map((category) => (
+                            <tr
+                                key={category.id}
+                                className="border-t border-blue-100 bg-white transition hover:bg-blue-50/40"
+                            >
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                        {category.imageUrl ? (
+                                            <div className="h-11 w-11 overflow-hidden rounded-lg ring-1 ring-blue-100">
+                                                <img
+                                                    src={category.imageUrl}
+                                                    alt={category.name}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                                                <FolderPlus className="h-4 w-4" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-semibold text-slate-950">
+                                                {category.name}
+                                            </p>
+                                            <p className="text-xs text-slate-500">
+                                                Catalog grouping
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-slate-600">
+                                    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                                        {category.totalProducts} produk
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span
+                                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                                            category.status === "Active"
+                                                ? "bg-blue-50 text-blue-700 ring-blue-100"
+                                                : "bg-slate-100 text-slate-600 ring-slate-200"
+                                        }`}
+                                    >
+                                        {category.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => onEdit(category)}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+                                        >
+                                            <PencilLine className="h-3.5 w-3.5" />
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onDelete(category)}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
 }

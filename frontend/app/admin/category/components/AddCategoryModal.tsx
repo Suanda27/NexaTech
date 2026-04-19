@@ -1,102 +1,255 @@
 "use client";
 
 import { useState } from "react";
+import {
+    FolderPlus,
+    ImagePlus,
+    Sparkles,
+    Tag,
+    X,
+} from "lucide-react";
+import type { CategoryStatus } from "../types";
+import { fileToDataUrl } from "../utils";
 
 interface Props {
-  isOpen: boolean;
-  onClose: () => void;
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (payload: {
+        name: string;
+        status: CategoryStatus;
+        imageUrl: string | null;
+    }) => void;
 }
 
-export default function AddCategoryModal({ isOpen, onClose }: Props) {
-  const [name, setName] = useState("");
-  const [status, setStatus] = useState("Active");
+const suggestedCategories = [
+    "Kategori Terlaris",
+    "Produk Baru",
+    "Aksesoris Premium",
+    "Home Office",
+    "Gaming Setup",
+];
 
-  if (!isOpen) return null;
+export default function AddCategoryModal({
+    isOpen,
+    onClose,
+    onSubmit,
+}: Props) {
+    const [name, setName] = useState("");
+    const [status, setStatus] = useState<CategoryStatus>("Active");
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
-  const handleClose = () => {
-    setName("");
-    setStatus("Active");
-    onClose();
-  };
+    if (!isOpen) return null;
 
-  const isDisabled = !name.trim();
+    const handleClose = () => {
+        setName("");
+        setStatus("Active");
+        setImageUrl(null);
+        onClose();
+    };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={handleClose}
-    >
-      <div
-        className="w-[90%] max-w-md rounded-2xl bg-white p-6 shadow-xl animate-fadeIn"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Tambah Kategori
-          </h2>
-          <button
+    const handleImageChange = async (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        setIsUploading(true);
+
+        try {
+            const nextImageUrl = await fileToDataUrl(file);
+            setImageUrl(nextImageUrl);
+        } finally {
+            setIsUploading(false);
+            event.target.value = "";
+        }
+    };
+
+    const handleSubmit = () => {
+        const trimmedName = name.trim();
+
+        if (!trimmedName) {
+            return;
+        }
+
+        onSubmit({
+            name: trimmedName,
+            status,
+            imageUrl,
+        });
+
+        setName("");
+        setStatus("Active");
+        setImageUrl(null);
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:items-center sm:py-8"
             onClick={handleClose}
-            className="text-xl text-gray-400 transition hover:text-gray-600"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Form */}
-        <div className="space-y-4">
-          {/* Nama */}
-          <div>
-            <label className="text-sm font-medium text-gray-600">
-              Nama Kategori
-            </label>
-            <input
-              type="text"
-              placeholder="Contoh: Elektronik"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-800 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="text-sm font-medium text-gray-600">
-              Status
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        >
+            <div
+                className="w-full max-w-lg rounded-lg border border-blue-100 bg-white p-6 shadow-[0_30px_80px_-36px_rgba(15,23,42,0.5)] sm:max-h-[calc(100dvh-4rem)] sm:overflow-y-auto sm:p-7"
+                onClick={(e) => e.stopPropagation()}
             >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
+                <div className="mb-6 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                            <FolderPlus className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-semibold text-slate-950">
+                                Tambah Kategori
+                            </h2>
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                                Buat kategori baru agar pengelompokan produk
+                                lebih terstruktur.
+                            </p>
+                        </div>
+                    </div>
 
-        {/* Actions */}
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            onClick={handleClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-100"
-          >
-            Batal
-          </button>
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
 
-          <button
-            disabled={isDisabled}
-            className={`rounded-lg px-4 py-2 text-white transition
-              ${
-                isDisabled
-                  ? "cursor-not-allowed bg-blue-400 opacity-70"
-                  : "bg-blue-600 hover:bg-blue-700 active:scale-95"
-              }`}
-          >
-            Simpan
-          </button>
+                <div className="space-y-5">
+                    <div>
+                        <label className="text-sm font-medium text-slate-700">
+                            Nama Kategori
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Contoh: Elektronik"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="mt-2 w-full rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-sm font-medium text-slate-700">
+                            Gambar Kategori
+                        </label>
+
+                        <div className="mt-2 grid gap-4 sm:grid-cols-[132px_minmax(0,1fr)]">
+                            <div className="flex h-32 items-center justify-center overflow-hidden rounded-lg border border-dashed border-blue-200 bg-blue-50/60">
+                                {imageUrl ? (
+                                    <img
+                                        src={imageUrl}
+                                        alt="Preview kategori"
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="space-y-2 text-center text-blue-700">
+                                        <ImagePlus className="mx-auto h-5 w-5" />
+                                        <p className="text-xs font-medium">
+                                            Belum ada gambar
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50">
+                                    <ImagePlus className="h-4 w-4" />
+                                    {isUploading ? "Uploading..." : "Upload Gambar"}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleImageChange}
+                                    />
+                                </label>
+
+                                <p className="text-sm leading-6 text-slate-500">
+                                    Gunakan gambar cover kategori agar daftar
+                                    kategori terlihat lebih jelas dan hidup.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-sm font-medium text-slate-700">
+                            Status
+                        </label>
+                        <div className="mt-2 grid grid-cols-2 gap-3">
+                            {(["Active", "Inactive"] as CategoryStatus[]).map(
+                                (option) => {
+                                    const isActive = status === option;
+
+                                    return (
+                                        <button
+                                            key={option}
+                                            type="button"
+                                            onClick={() => setStatus(option)}
+                                            className={`rounded-lg border px-4 py-3 text-sm font-semibold transition ${
+                                                isActive
+                                                    ? "border-blue-500 bg-blue-600 text-white shadow-lg shadow-blue-200"
+                                                    : "border-blue-100 bg-white text-slate-600 hover:bg-blue-50"
+                                            }`}
+                                        >
+                                            {option}
+                                        </button>
+                                    );
+                                },
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                            <Sparkles className="h-4 w-4 text-blue-600" />
+                            Pilihan cepat
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Pilih nama kategori yang sering dipakai untuk mulai
+                            lebih cepat.
+                        </p>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {suggestedCategories.map((suggestion) => (
+                                <button
+                                    key={suggestion}
+                                    type="button"
+                                    onClick={() => setName(suggestion)}
+                                    className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 transition hover:bg-blue-100"
+                                >
+                                    <Tag className="h-3.5 w-3.5" />
+                                    {suggestion}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-7 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                    >
+                        Batal
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!name.trim() || isUploading}
+                        className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Simpan Kategori
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }

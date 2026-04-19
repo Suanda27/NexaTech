@@ -1,60 +1,158 @@
 "use client";
 
 import {
-    LineChart,
+    Area,
+    AreaChart,
+    CartesianGrid,
     Line,
+    ResponsiveContainer,
+    Tooltip,
     XAxis,
     YAxis,
-    Tooltip,
-    ResponsiveContainer,
 } from "recharts";
 
 const data = [
-    { month: "Jan", value: 180 },
-    { month: "Feb", value: 195 },
-    { month: "Mar", value: 210 },
-    { month: "Apr", value: 225 },
-    { month: "May", value: 235 },
-    { month: "Jun", value: 245 },
+    { month: "Jan", revenue: 165, orders: 840 },
+    { month: "Feb", revenue: 182, orders: 915 },
+    { month: "Mar", revenue: 205, orders: 1010 },
+    { month: "Apr", revenue: 214, orders: 1096 },
+    { month: "May", revenue: 238, orders: 1184 },
+    { month: "Jun", revenue: 245, orders: 1284 },
 ];
+
+function CustomTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: Array<{ value: number; color: string; name: string }>;
+    label?: string;
+}) {
+    if (!active || !payload?.length) {
+        return null;
+    }
+
+    return (
+        <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 shadow-xl shadow-blue-100/60">
+            <p className="text-sm font-semibold text-slate-950">{label}</p>
+            <div className="mt-2 space-y-1.5">
+                {payload.map((entry) => (
+                    <div
+                        key={entry.name}
+                        className="flex items-center justify-between gap-5 text-xs"
+                    >
+                        <span
+                            className="flex items-center gap-2 text-slate-500"
+                            style={{ color: entry.color }}
+                        >
+                            <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                            />
+                            {entry.name}
+                        </span>
+                        <span className="font-semibold text-slate-900">
+                            {entry.name === "Revenue"
+                                ? `Rp ${entry.value}M`
+                                : `${entry.value} orders`}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function SalesChart() {
     return (
-        <div className="rounded-3xl border border-blue-100 bg-white p-4 shadow-sm sm:p-6">
-            <div className="h-72 min-w-0">
+        <div className="space-y-5">
+            <div className="flex flex-wrap gap-3">
+                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-700">
+                        Revenue
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">
+                        Rp 245M
+                    </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
+                        Orders
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-slate-950">
+                        1,284
+                    </p>
+                </div>
+            </div>
+
+            <div className="h-80 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                        data={data}
-                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                    >
+                    <AreaChart data={data} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+                        <defs>
+                            <linearGradient
+                                id="revenueFill"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                            >
+                                <stop offset="0%" stopColor="#2563eb" stopOpacity={0.28} />
+                                <stop offset="100%" stopColor="#2563eb" stopOpacity={0.03} />
+                            </linearGradient>
+                        </defs>
+
+                        <CartesianGrid
+                            stroke="#dbeafe"
+                            strokeDasharray="4 4"
+                            vertical={false}
+                        />
                         <XAxis
                             dataKey="month"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: "#475569", fontSize: 12 }}
+                            tickMargin={10}
+                            tick={{ fill: "#64748b", fontSize: 12 }}
                         />
                         <YAxis
+                            yAxisId="left"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: "#475569", fontSize: 12 }}
+                            tickMargin={10}
+                            tick={{ fill: "#64748b", fontSize: 12 }}
+                            tickFormatter={(value) => `${value}M`}
                         />
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #DBEAFE",
-                                borderRadius: "12px",
-                                boxShadow: "0 10px 25px rgba(15, 23, 42, 0.08)",
-                            }}
+                        <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            axisLine={false}
+                            tickLine={false}
+                            tickMargin={10}
+                            tick={{ fill: "#94a3b8", fontSize: 12 }}
+                            tickFormatter={(value) => `${value}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+
+                        <Area
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="revenue"
+                            name="Revenue"
+                            stroke="#2563eb"
+                            fill="url(#revenueFill)"
+                            strokeWidth={3}
                         />
                         <Line
+                            yAxisId="right"
                             type="monotone"
-                            dataKey="value"
-                            stroke="#2563EB"
-                            strokeWidth={3}
-                            dot={{ fill: "#2563EB", strokeWidth: 2, r: 4 }}
-                            activeDot={{ r: 6, fill: "#1D4ED8" }}
+                            dataKey="orders"
+                            name="Orders"
+                            stroke="#0f172a"
+                            strokeWidth={2}
+                            dot={{ fill: "#0f172a", r: 3 }}
+                            activeDot={{ r: 5, fill: "#0f172a" }}
                         />
-                    </LineChart>
+                    </AreaChart>
                 </ResponsiveContainer>
             </div>
         </div>

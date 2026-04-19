@@ -20,18 +20,18 @@ export default function AdminLayout({
 
     return (
         <AuthGuard requiredRole="admin" loginPath="/admin/login">
-            <div className="min-h-screen bg-blue-50 lg:flex lg:overflow-hidden">
+            <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] lg:h-screen lg:overflow-hidden lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
                 <Sidebar
                     isOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen((prev) => !prev)}
                 />
 
-                <div className="flex-1 min-h-screen lg:pl-0 min-w-0">
+                <div className="min-h-screen min-w-0 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
                     <Header
                         mobileOpen={sidebarOpen}
                         onToggle={() => setSidebarOpen((prev) => !prev)}
                     />
-                    <main className="flex-1">{children}</main>
+                    <main className="flex-1 lg:overflow-y-auto">{children}</main>
                 </div>
             </div>
         </AuthGuard>
