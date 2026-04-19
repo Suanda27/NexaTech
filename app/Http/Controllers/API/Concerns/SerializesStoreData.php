@@ -8,13 +8,15 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductSpecification;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 trait SerializesStoreData
 {
     protected function serializeCategory(Category $category): array
     {
-        $totalProducts = $category->products_count
-            ?? $category->products()->count();
+        $totalProducts = Schema::hasTable('products')
+            ? ($category->products_count ?? $category->products()->count())
+            : 0;
 
         return [
             'id' => $category->category_id,

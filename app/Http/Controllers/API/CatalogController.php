@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class CatalogController extends Controller
 {
@@ -16,7 +17,10 @@ class CatalogController extends Controller
     {
         $categories = Category::query()
             ->where('is_active', true)
-            ->withCount('products')
+            ->when(
+                Schema::hasTable('products'),
+                fn ($query) => $query->withCount('products'),
+            )
             ->orderBy('nama_kategori')
             ->get();
 

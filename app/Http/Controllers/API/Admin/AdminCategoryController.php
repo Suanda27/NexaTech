@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -16,7 +17,10 @@ class AdminCategoryController extends Controller
     public function index()
     {
         $categories = Category::query()
-            ->withCount('products')
+            ->when(
+                Schema::hasTable('products'),
+                fn ($query) => $query->withCount('products'),
+            )
             ->orderBy('nama_kategori')
             ->get();
 
@@ -26,7 +30,9 @@ class AdminCategoryController extends Controller
                 ->values(),
             'summary' => [
                 'totalCategories' => $categories->count(),
-                'totalProducts' => $categories->sum('products_count'),
+                'totalProducts' => Schema::hasTable('products')
+                    ? $categories->sum('products_count')
+                    : 0,
                 'activeCategories' => $categories->where('is_active', true)->count(),
                 'inactiveCategories' => $categories->where('is_active', false)->count(),
             ],
@@ -52,7 +58,9 @@ class AdminCategoryController extends Controller
 
         return response()->json([
             'message' => 'Kategori berhasil ditambahkan.',
-            'data' => $this->serializeCategory($category->loadCount('products')),
+            'data' => $this->serializeCategory(
+                Schema::hasTable('products') ? $category->loadCount('products') : $category
+            ),
         ], 201);
     }
 
@@ -80,7 +88,9 @@ class AdminCategoryController extends Controller
 
         return response()->json([
             'message' => 'Kategori berhasil diperbarui.',
-            'data' => $this->serializeCategory($category->fresh()->loadCount('products')),
+            'data' => $this->serializeCategory(
+                Schema::hasTable('products') ? $category->fresh()->loadCount('products') : $category->fresh()
+            ),
         ]);
     }
 
