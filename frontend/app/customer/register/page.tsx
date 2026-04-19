@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { apiUrl, resolveCustomerRedirect } from "@/lib/auth";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         fullName: "",
@@ -17,21 +19,36 @@ export default function RegisterPage() {
         confirmPassword: "",
     });
 
-    const { setUser } = useAuth();
+    const { user, isLoading, login } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirect = searchParams.get("redirect");
+    const loginHref = redirect
+        ? `/customer/login?redirect=${encodeURIComponent(redirect)}`
+        : "/customer/login";
 
-    // ✅ FIXED REGISTER + AUTO LOGIN
+    useEffect(() => {
+        if (isLoading || !user) {
+            return;
+        }
+
+        router.replace(
+            resolveCustomerRedirect(redirect, user.role),
+        );
+    }, [isLoading, redirect, router, user]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
 
         try {
-            // 🔥 REGISTER
             const registerRes = await fetch(
-                "http://localhost:8000/api/auth/register",
+                apiUrl("/api/auth/register"),
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        Accept: "application/json",
                     },
                     body: JSON.stringify({
                         name: formData.fullName,
@@ -45,17 +62,21 @@ export default function RegisterPage() {
             const registerData = await registerRes.json();
 
             if (!registerRes.ok) {
-                alert(registerData.message || "Register gagal");
+                alert(
+                    registerData.message ||
+                        registerData.errors?.email?.[0] ||
+                        "Register gagal",
+                );
                 return;
             }
 
-            // 🔥 AUTO LOGIN
             const loginRes = await fetch(
-                "http://localhost:8000/api/auth/login",
+                apiUrl("/api/auth/login"),
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
+                        Accept: "application/json",
                     },
                     body: JSON.stringify({
                         email: formData.email,
@@ -67,21 +88,22 @@ export default function RegisterPage() {
             const loginData = await loginRes.json();
 
             if (!loginRes.ok) {
-                alert("Register berhasil, tapi login gagal");
+                alert(
+                    loginData.message ||
+                        loginData.errors?.email?.[0] ||
+                        "Register berhasil, tapi login gagal",
+                );
                 return;
             }
 
-            // 🔥 SIMPAN TOKEN
-            localStorage.setItem("token", loginData.token);
-
-            // 🔥 SET USER GLOBAL (langsung ubah header)
-            setUser(loginData.user);
-
-            // 🔥 REDIRECT KE HOME
-            router.push("/");
+            const loggedInUser = await login(loginData.token, loginData.user);
+            const role = loggedInUser?.role ?? loginData.user?.role ?? "user";
+            router.replace(resolveCustomerRedirect(redirect, role));
         } catch (error) {
             console.error(error);
             alert("Terjadi kesalahan koneksi");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -244,9 +266,10 @@ export default function RegisterPage() {
                         {/* Register Button */}
                         <button
                             type="submit"
+                            disabled={isSubmitting}
                             className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#0B1F3A] to-[#0F2A44] py-4 font-medium text-white shadow-lg shadow-blue-500/30 transition-all duration-300 hover:shadow-blue-500/50"
                         >
-                            Register
+                            {isSubmitting ? "Creating account..." : "Register"}
                         </button>
                     </form>
 
@@ -254,7 +277,7 @@ export default function RegisterPage() {
                     <div className="mt-6 text-center text-sm text-blue-200/60">
                         Already have an account?{" "}
                         <Link
-                            href="/customer/login"
+                            href={loginHref}
                             className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
                         >
                             Login

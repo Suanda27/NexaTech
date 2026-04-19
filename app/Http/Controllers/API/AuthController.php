@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -26,57 +27,82 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'address' => $request->address,
-            'role' => 'user'
+            'role' => User::ROLE_USER,
         ]);
 
         return response()->json([
             'message' => 'Register success',
-            'user' => $user
+            'user' => $user,
         ], 201);
     }
 
-    // 🔥 LOGIN (TOKEN BASED)
+    // LOGIN (TOKEN BASED)
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        // jika user tidak ada / password salah
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Email atau password salah'
-            ], 401);
-        }
-
-        // hapus semua token lama (biar tidak numpuk)
-        $user->tokens()->delete();
-
-        // 🔥 generate token baru
-        $token = $user->createToken('auth_token')->plainTextToken;
+        [$user, $token] = $this->attemptLogin($request);
 
         return response()->json([
             'message' => 'Login berhasil',
             'token' => $token,
-            'user' => $user
+            'user' => $user,
         ]);
     }
 
-    // LOGOUT (FIXED)
-    public function logout(Request $request)
+    public function adminLogin(Request $request)
     {
-        $user = $request->user();
-
-        if ($user) {
-            // hapus semua token (AMAN)
-            $user->tokens()->delete();
-        }
+        [$user, $token] = $this->attemptLogin($request, User::ROLE_ADMIN);
 
         return response()->json([
-            'message' => 'Logout berhasil'
+            'message' => 'Login admin berhasil',
+            'token' => $token,
+            'user' => $user,
         ]);
+    }
+
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
+    }
+
+    // LOGOUT
+    public function logout(Request $request)
+    {
+        $request->user()?->currentAccessToken()?->delete();
+
+        return response()->json([
+            'message' => 'Logout berhasil',
+        ]);
+    }
+
+    /**
+     * @return array{0: \App\Models\User, 1: string}
+     */
+    protected function attemptLogin(Request $request, ?string $requiredRole = null): array
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['Email atau password salah.'],
+            ]);
+        }
+
+        if ($requiredRole !== null && $user->role !== $requiredRole) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun ini tidak punya akses ke halaman admin.'],
+            ]);
+        }
+
+        $user->tokens()->delete();
+
+        $abilities = $user->isAdmin() ? ['admin'] : ['customer'];
+        $token = $user->createToken('auth_token', $abilities)->plainTextToken;
+
+        return [$user, $token];
     }
 }

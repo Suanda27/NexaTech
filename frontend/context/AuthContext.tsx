@@ -1,48 +1,154 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-
-type User = {
-    id: number;
-    name: string;
-    email: string;
-};
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+import {
+    authFetch,
+    clearStoredToken,
+    getStoredToken,
+    setStoredToken,
+    type AuthUser,
+} from "@/lib/auth";
 
 type AuthContextType = {
-    user: User | null;
-    setUser: (user: User | null) => void;
+    user: AuthUser | null;
+    isLoading: boolean;
+    setUser: (user: AuthUser | null) => void;
+    refreshUser: (options?: { adminOnly?: boolean }) => Promise<AuthUser | null>;
+    login: (token: string, nextUser?: AuthUser | null) => Promise<AuthUser | null>;
+    logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AuthUser | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const token = localStorage.getItem("token");
+    const refreshUser = useCallback(
+        async ({
+            adminOnly = false,
+        }: {
+            adminOnly?: boolean;
+        } = {}): Promise<AuthUser | null> => {
+            const token = getStoredToken();
 
-        if (!token) return;
-
-        fetch("http://localhost:8000/api/user", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error();
-                return res.json();
-            })
-            .then((data) => setUser(data))
-            .catch(() => {
-                localStorage.removeItem("token");
+            if (!token) {
                 setUser(null);
-            });
+                return null;
+            }
+
+            const endpoint = adminOnly ? "/api/admin/me" : "/api/auth/me";
+
+            try {
+                const res = await authFetch(endpoint, {}, token);
+
+                if (!res.ok) {
+                    throw new Error("Unauthenticated");
+                }
+
+                const data = (await res.json()) as AuthUser;
+                setUser(data);
+                return data;
+            } catch {
+                clearStoredToken();
+                setUser(null);
+                return null;
+            }
+        },
+        [],
+    );
+
+    const login = useCallback(
+        async (token: string, nextUser?: AuthUser | null) => {
+            setStoredToken(token);
+
+            if (nextUser) {
+                setUser(nextUser);
+                return nextUser;
+            }
+
+            return refreshUser();
+        },
+        [refreshUser],
+    );
+
+    const logout = useCallback(async () => {
+        const token = getStoredToken();
+
+        try {
+            if (token) {
+                await authFetch(
+                    "/api/auth/logout",
+                    {
+                        method: "POST",
+                    },
+                    token,
+                );
+            }
+        } catch {
+            // Keep local logout deterministic even if API is unavailable.
+        } finally {
+            clearStoredToken();
+            setUser(null);
+        }
     }, []);
 
+    useEffect(() => {
+        let mounted = true;
+
+        const hydrateAuth = async () => {
+            const token = getStoredToken();
+
+            if (!token) {
+                if (mounted) {
+                    setUser(null);
+                    setIsLoading(false);
+                }
+                return;
+            }
+
+            await refreshUser();
+
+            if (mounted) {
+                setIsLoading(false);
+            }
+        };
+
+        void hydrateAuth();
+
+        const syncAuth = () => {
+            void refreshUser();
+        };
+
+        window.addEventListener("storage", syncAuth);
+
+        return () => {
+            mounted = false;
+            window.removeEventListener("storage", syncAuth);
+        };
+    }, [refreshUser]);
+
+    const value = useMemo(
+        () => ({
+            user,
+            isLoading,
+            setUser,
+            refreshUser,
+            login,
+            logout,
+        }),
+        [isLoading, login, logout, refreshUser, user],
+    );
+
     return (
-        <AuthContext.Provider value={{ user, setUser }}>
-            {children}
-        </AuthContext.Provider>
+        <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
     );
 }
 

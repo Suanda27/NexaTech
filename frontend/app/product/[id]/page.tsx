@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import AuthGuard from "@/app/components/auth/AuthGuard";
 
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
@@ -98,8 +99,9 @@ export default function ProductDetailPage() {
     const formatPrice = (num: number) => num.toLocaleString("en-US");
 
     return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
-            {user ? <HeaderUser /> : <HeaderGuest />}
+        <AuthGuard loginPath="/customer/login">
+            <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
+                {user ? <HeaderUser /> : <HeaderGuest />}
 
             <div className="w-full flex-1 mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-10 md:py-8 md:space-y-12">
                 <Link
@@ -308,7 +310,8 @@ export default function ProductDetailPage() {
                 </section>
             </div>
 
-            <Footer />
-        </div>
+                <Footer />
+            </div>
+        </AuthGuard>
     );
 }

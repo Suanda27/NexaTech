@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
+import AuthGuard from "@/app/components/auth/AuthGuard";
 
 export default function CheckoutPage() {
     const router = useRouter();
@@ -51,8 +52,9 @@ export default function CheckoutPage() {
         "w-full rounded-lg border border-gray-200 bg-white py-3 pl-11 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
 
     return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
-            {user ? <HeaderUser /> : <HeaderGuest />}
+        <AuthGuard loginPath="/customer/login">
+            <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
+                {user ? <HeaderUser /> : <HeaderGuest />}
 
             <div className="w-full flex-1 max-w-6xl mx-auto px-4 py-6 space-y-6 sm:py-8 sm:space-y-8">
                 <div className="flex flex-col gap-4 rounded-lg border border-blue-100 bg-white p-5 shadow-sm shadow-blue-100/50 sm:flex-row sm:items-end sm:justify-between sm:p-6">
@@ -307,7 +309,8 @@ export default function CheckoutPage() {
                 </form>
             </div>
 
-            <Footer />
-        </div>
+                <Footer />
+            </div>
+        </AuthGuard>
     );
 }

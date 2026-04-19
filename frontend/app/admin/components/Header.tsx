@@ -1,8 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
-import { Menu, Search, Shield, User, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+    ChevronDown,
+    LogOut,
+    Menu,
+    Search,
+    Shield,
+    User,
+    X,
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface HeaderProps {
     mobileOpen: boolean;
@@ -10,10 +20,23 @@ interface HeaderProps {
 }
 
 export default function Header({ mobileOpen, onToggle }: HeaderProps) {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const router = useRouter();
+    const { user, logout } = useAuth();
+
     const adminInfo = useMemo(
-        () => ({ name: "Raka Pranata", role: "Administrator" }),
-        [],
+        () => ({
+            name: user?.name ?? "Administrator",
+            role: user?.role === "admin" ? "Administrator" : "Staff",
+        }),
+        [user],
     );
+
+    const handleLogout = async () => {
+        await logout();
+        setMenuOpen(false);
+        router.replace("/admin/login");
+    };
 
     return (
         <header className="bg-white border-b border-blue-100 shadow-sm">
@@ -63,7 +86,7 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="relative flex items-center gap-3">
                     <div className="hidden sm:flex flex-col text-right">
                         <span className="text-sm font-semibold text-slate-900">
                             {adminInfo.name}
@@ -73,9 +96,27 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                             {adminInfo.role}
                         </span>
                     </div>
-                    <button className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-600 shadow-sm transition hover:bg-blue-200">
+                    <button
+                        type="button"
+                        onClick={() => setMenuOpen((prev) => !prev)}
+                        className="inline-flex h-11 items-center gap-2 rounded-full bg-blue-100 px-3 text-blue-700 shadow-sm transition hover:bg-blue-200"
+                    >
                         <User size={20} />
+                        <ChevronDown size={16} />
                     </button>
+
+                    {menuOpen && (
+                        <div className="absolute right-0 top-14 z-20 w-52 rounded-2xl border border-blue-100 bg-white p-2 shadow-xl shadow-blue-100/70">
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm text-red-600 transition hover:bg-red-50"
+                            >
+                                <LogOut className="h-4 w-4" />
+                                Logout
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </header>

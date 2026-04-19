@@ -1,31 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { apiUrl, resolveCustomerRedirect } from "@/lib/auth";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         email: "",
         password: "",
     });
 
-    const { setUser } = useAuth();
+    const { user, isLoading, login } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirect = searchParams.get("redirect");
+    const registerHref = redirect
+        ? `/customer/register?redirect=${encodeURIComponent(redirect)}`
+        : "/customer/register";
 
-    // ✅ FIXED LOGIN FUNCTION (INI YANG PENTING)
+    useEffect(() => {
+        if (isLoading || !user) {
+            return;
+        }
+
+        router.replace(
+            resolveCustomerRedirect(redirect, user.role),
+        );
+    }, [isLoading, redirect, router, user]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
 
         try {
-            const res = await fetch("http://localhost:8000/api/auth/login", {
+            const res = await fetch(apiUrl("/api/auth/login"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    Accept: "application/json",
                 },
                 body: JSON.stringify(formData),
             });
@@ -33,21 +51,22 @@ export default function LoginPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                alert(data.message || "Login gagal");
+                alert(
+                    data.message ||
+                        data.errors?.email?.[0] ||
+                        "Login gagal",
+                );
                 return;
             }
 
-            // 🔥 simpan token
-            localStorage.setItem("token", data.token);
-
-            // 🔥 set user global (langsung ubah header)
-            setUser(data.user);
-
-            // 🔥 redirect ke home
-            router.push("/");
+            const loggedInUser = await login(data.token, data.user);
+            const role = loggedInUser?.role ?? data.user?.role ?? "user";
+            router.replace(resolveCustomerRedirect(redirect, role));
         } catch (error) {
             console.error(error);
             alert("Terjadi kesalahan koneksi");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -147,9 +166,10 @@ export default function LoginPage() {
                         {/* Login Button */}
                         <button
                             type="submit"
+                            disabled={isSubmitting}
                             className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#0B1F3A] to-[#0F2A44] py-4 font-medium text-white shadow-lg shadow-blue-500/30 transition-all duration-300 hover:shadow-blue-500/50"
                         >
-                            Login
+                            {isSubmitting ? "Signing in..." : "Login"}
                         </button>
                     </form>
 
@@ -157,7 +177,7 @@ export default function LoginPage() {
                     <div className="mt-6 text-center text-sm text-blue-200/60">
                         Don't have an account?{" "}
                         <Link
-                            href="/customer/register"
+                            href={registerHref}
                             className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
                         >
                             Register

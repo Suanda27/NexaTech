@@ -7,6 +7,7 @@ import PersonalInfo from "@/app/components/profile/PersonalInfo";
 
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
+import AuthGuard from "@/app/components/auth/AuthGuard";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -23,28 +24,27 @@ export default function Page() {
     }, [tab]);
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* 🔥 HEADER PUNYA KAMU */}
-            <HeaderUser />
+        <AuthGuard loginPath="/customer/login">
+            <div className="min-h-screen bg-gray-50 flex flex-col">
+                <HeaderUser />
 
-            {/* CONTENT */}
-            <div className="flex flex-1 flex-col lg:flex-row">
-                <Sidebar active={active} setActive={setActive} />
+                <div className="flex flex-1 flex-col lg:flex-row">
+                    <Sidebar active={active} setActive={setActive} />
 
-                <div className="min-w-0 flex-1 p-4 sm:p-6">
-                    {active === "orders" && (
-                        <>
-                            <OrderSummaryCards />
-                            <OrderHistorySection />
-                        </>
-                    )}
+                    <div className="min-w-0 flex-1 p-4 sm:p-6">
+                        {active === "orders" && (
+                            <>
+                                <OrderSummaryCards />
+                                <OrderHistorySection />
+                            </>
+                        )}
 
-                    {active === "personal" && <PersonalInfo />}
+                        {active === "personal" && <PersonalInfo />}
+                    </div>
                 </div>
-            </div>
 
-            {/* 🔥 FOOTER PUNYA KAMU */}
-            <Footer />
-        </div>
+                <Footer />
+            </div>
+        </AuthGuard>
     );
 }
