@@ -98,8 +98,6 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->tokens()->delete();
-
         $abilities = $user->isAdmin() ? ['admin'] : ['customer'];
         $token = $user->createToken('auth_token', $abilities)->plainTextToken;
 

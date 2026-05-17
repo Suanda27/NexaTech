@@ -123,15 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         void hydrateAuth();
 
-        const syncAuth = () => {
-            void refreshUser();
-        };
-
-        window.addEventListener("storage", syncAuth);
-
         return () => {
             mounted = false;
-            window.removeEventListener("storage", syncAuth);
         };
     }, [refreshUser]);
 

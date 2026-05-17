@@ -14,25 +14,42 @@ const API_BASE_URL =
     "http://localhost:8000";
 
 const TOKEN_KEY = "nexatech_token";
+let memoryToken: string | null = null;
+
+function getAuthStorage(): Storage | null {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    try {
+        return window.sessionStorage;
+    } catch {
+        return null;
+    }
+}
 
 export function apiUrl(path: string): string {
     return `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export function getStoredToken(): string | null {
-    if (typeof window === "undefined") {
-        return null;
+    const storage = getAuthStorage();
+
+    if (!storage) {
+        return memoryToken;
     }
 
-    return localStorage.getItem(TOKEN_KEY);
+    return storage.getItem(TOKEN_KEY) ?? memoryToken;
 }
 
 export function setStoredToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
+    memoryToken = token;
+    getAuthStorage()?.setItem(TOKEN_KEY, token);
 }
 
 export function clearStoredToken(): void {
-    localStorage.removeItem(TOKEN_KEY);
+    memoryToken = null;
+    getAuthStorage()?.removeItem(TOKEN_KEY);
 }
 
 export async function authFetch(
