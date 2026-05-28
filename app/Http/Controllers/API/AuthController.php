@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -61,13 +62,35 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        if ($request->bearerToken() && !PersonalAccessToken::findToken($request->bearerToken())) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
         return response()->json($request->user());
     }
 
     // LOGOUT
     public function logout(Request $request)
     {
-        $request->user()?->currentAccessToken()?->delete();
+        $token = $request->bearerToken();
+
+        if ($token) {
+            $tokenId = str_contains($token, '|')
+                ? explode('|', $token, 2)[0]
+                : null;
+
+            if ($tokenId) {
+                PersonalAccessToken::query()
+                    ->whereKey($tokenId)
+                    ->delete();
+            } else {
+                PersonalAccessToken::findToken($token)?->delete();
+            }
+        } else {
+            $request->user()?->currentAccessToken()?->delete();
+        }
 
         return response()->json([
             'message' => 'Logout berhasil',

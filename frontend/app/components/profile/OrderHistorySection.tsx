@@ -1,135 +1,64 @@
 "use client";
 
-import { useState } from "react";
-import OrderCard from "./OrderCard";
-import { OrderType } from "@/app/types/order";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { Package } from "lucide-react";
+import { fetchOrders, type OrderData } from "@/lib/store";
 
 export default function OrderHistorySection() {
     const [active, setActive] = useState<"bank" | "cod">("bank");
+    const [orders, setOrders] = useState<OrderData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const orders: OrderType[] = [
-        {
-            id: "001",
-            status: "Processing",
-            method: "bank",
-            date: "April 5, 2026",
-            total: 1389.97,
-            isPaid: true,
-            items: [
-                {
-                    name: "Premium Laptop Pro",
-                    image: "/images/laptop.jpg",
-                    qty: 1,
-                    price: 1299.99,
-                },
-                {
-                    name: "Wireless Mouse",
-                    image: "/images/mouse.jpg",
-                    qty: 2,
-                    price: 89.98,
-                },
-            ],
-        },
-        {
-            id: "002",
-            status: "Delivered",
-            method: "bank",
-            date: "April 6, 2026",
-            total: 599.99,
-            isPaid: true,
-            items: [
-                {
-                    name: "Smart Tablet",
-                    image: "/images/tablet.jpg",
-                    qty: 1,
-                    price: 599.99,
-                },
-            ],
-        },
-        {
-            id: "003",
-            status: "Declined",
-            method: "bank",
-            date: "April 7, 2026",
-            total: 499.99,
-            isPaid: false,
-            declineReason: "Payment verification failed.",
-            items: [
-                {
-                    name: "Keyboard",
-                    image: "/images/keyboard.jpg",
-                    qty: 1,
-                    price: 499.99,
-                },
-            ],
-        },
+    useEffect(() => {
+        let mounted = true;
 
-        // COD
-        {
-            id: "004",
-            status: "Processing",
-            method: "cod",
-            date: "April 8, 2026",
-            total: 800,
-            isPaid: false,
-            items: [
-                {
-                    name: "Monitor",
-                    image: "/images/monitor.jpg",
-                    qty: 1,
-                    price: 800,
-                },
-            ],
-        },
-        {
-            id: "005",
-            status: "Delivered",
-            method: "cod",
-            date: "April 9, 2026",
-            total: 299.99,
-            isPaid: false,
-            items: [
-                {
-                    name: "Headphones",
-                    image: "/images/headphone.jpg",
-                    qty: 1,
-                    price: 299.99,
-                },
-            ],
-        },
-        {
-            id: "006",
-            status: "Declined",
-            method: "cod",
-            date: "April 10, 2026",
-            total: 199.99,
-            isPaid: false,
-            declineReason: "Address not reachable.",
-            items: [
-                {
-                    name: "Webcam",
-                    image: "/images/webcam.jpg",
-                    qty: 1,
-                    price: 199.99,
-                },
-            ],
-        },
-    ];
+        const loadOrders = async () => {
+            try {
+                const response = await fetchOrders();
 
-    const filtered = orders.filter((o) => o.method === active);
+                if (mounted) {
+                    setOrders(response.data);
+                }
+            } catch {
+                if (mounted) {
+                    setOrders([]);
+                }
+            } finally {
+                if (mounted) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        void loadOrders();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const filtered = useMemo(
+        () =>
+            orders.filter((order) =>
+                active === "bank"
+                    ? order.paymentMethodKey === "bank_transfer"
+                    : order.paymentMethodKey === "cod",
+            ),
+        [active, orders],
+    );
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mt-6 shadow-sm sm:p-6">
-            {/* TITLE */}
-            <h2 className="text-xl font-bold text-gray-900 mb-5">
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="mb-5 text-xl font-bold text-gray-900">
                 Order History
             </h2>
 
-            {/* TOGGLE */}
-            <div className="flex w-full gap-2 overflow-x-auto rounded-lg bg-gray-100 p-1 mb-6 sm:w-fit">
+            <div className="mb-6 flex w-full gap-2 overflow-x-auto rounded-lg bg-gray-100 p-1 sm:w-fit">
                 <button
+                    type="button"
                     onClick={() => setActive("bank")}
-                    className={`min-w-max px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 sm:px-6 ${
+                    className={`min-w-max rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 sm:px-6 ${
                         active === "bank"
                             ? "bg-white text-black shadow-md"
                             : "text-gray-500 hover:text-black"
@@ -139,8 +68,9 @@ export default function OrderHistorySection() {
                 </button>
 
                 <button
+                    type="button"
                     onClick={() => setActive("cod")}
-                    className={`min-w-max px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 sm:px-6 ${
+                    className={`min-w-max rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 sm:px-6 ${
                         active === "cod"
                             ? "bg-white text-black shadow-md"
                             : "text-gray-500 hover:text-black"
@@ -150,12 +80,80 @@ export default function OrderHistorySection() {
                 </button>
             </div>
 
-            {/* LIST */}
-            <div className="space-y-6">
-                {filtered.map((order) => (
-                    <OrderCard key={order.id} order={order} />
-                ))}
-            </div>
+            {isLoading ? (
+                <div className="space-y-4">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                        <div
+                            key={index}
+                            className="h-32 animate-pulse rounded-lg border border-blue-100 bg-blue-50"
+                        />
+                    ))}
+                </div>
+            ) : filtered.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-6 py-12 text-center">
+                    <p className="font-semibold text-slate-950">
+                        Belum ada order untuk metode ini
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                        Pesanan yang dibuat customer akan muncul dari backend.
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {filtered.map((order) => (
+                        <div
+                            key={order.id}
+                            className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5"
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <p className="text-lg font-semibold text-slate-950">
+                                        {order.orderNumber}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {order.orderDate} - {order.status}
+                                    </p>
+                                </div>
+                                <p className="text-lg font-bold text-blue-700">
+                                    Rp {order.summary.total.toLocaleString("id-ID")}
+                                </p>
+                            </div>
+
+                            <div className="mt-4 grid gap-3">
+                                {order.items.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3"
+                                    >
+                                        <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+                                            {item.productImage ? (
+                                                <Image
+                                                    src={item.productImage}
+                                                    alt={item.productName}
+                                                    fill
+                                                    sizes="48px"
+                                                    unoptimized
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <Package className="h-5 w-5" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-semibold text-slate-950">
+                                                {item.productName}
+                                            </p>
+                                            <p className="text-sm text-slate-500">
+                                                Qty {item.quantity}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

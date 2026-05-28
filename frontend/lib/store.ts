@@ -38,6 +38,7 @@ export type ApiProduct = {
     specs?: ApiProductSpec[];
     gallery?: string[];
     relatedProducts?: ApiProduct[];
+    recommendationReason?: string;
 };
 
 export type PaginatedProductsResponse = {
@@ -190,9 +191,18 @@ export function fetchFeaturedProducts() {
     return fetchJson<{ data: ApiProduct[] }>("/api/products/featured");
 }
 
+export function fetchPublicRecommendations() {
+    return fetchJson<{ data: ApiProduct[] }>("/api/products/recommendations");
+}
+
+export function fetchPersonalRecommendations() {
+    return fetchJson<{ data: ApiProduct[] }>("/api/recommendations");
+}
+
 export function fetchProducts(params: {
     category?: string | null;
     price?: string | null;
+    q?: string | null;
     sort?: string | null;
     page?: number;
     perPage?: number;
@@ -201,11 +211,19 @@ export function fetchProducts(params: {
         `/api/products${queryString({
             category: params.category,
             price: params.price,
+            q: params.q,
             sort: params.sort,
             page: params.page,
             per_page: params.perPage,
         })}`,
     );
+}
+
+export function trackProductSearch(keyword: string) {
+    return sendJson<{ message: string }>("/api/product-searches", {
+        method: "POST",
+        body: JSON.stringify({ keyword }),
+    });
 }
 
 export function fetchProductDetail(productId: string | number) {

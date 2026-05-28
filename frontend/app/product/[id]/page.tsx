@@ -288,10 +288,6 @@ export default function ProductDetailPage() {
                                             You May Also Like
                                         </h2>
                                     </div>
-                                    <p className="max-w-md text-sm text-gray-500">
-                                        Rekomendasi ini juga mengikuti data produk
-                                        aktif dari database.
-                                    </p>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">

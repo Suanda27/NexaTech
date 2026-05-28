@@ -24,6 +24,7 @@ Route::prefix('auth')->group(function () {
 
 Route::get('/categories', [CatalogController::class, 'categories']);
 Route::get('/products/featured', [CatalogController::class, 'featuredProducts']);
+Route::get('/products/recommendations', [CatalogController::class, 'publicRecommendations']);
 Route::get('/products', [CatalogController::class, 'products']);
 Route::get('/products/{product}', [CatalogController::class, 'show']);
 
@@ -40,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
+
+    Route::post('/product-searches', [CatalogController::class, 'storeSearch']);
+    Route::get('/recommendations', [CatalogController::class, 'recommendations']);
 });
 
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {

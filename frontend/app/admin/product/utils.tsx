@@ -28,6 +28,18 @@ const SPEC_ICONS: Record<SpecIconKey, LucideIcon> = {
     camera: Camera,
 };
 
+const API_SPEC_ICON_ALIASES: Record<string, LucideIcon> = {
+    connectivity: Zap,
+    cpu: Cpu,
+    keyboard: Monitor,
+    memory: HardDrive,
+    mouse: Monitor,
+    power: Zap,
+    refresh: Monitor,
+    ruler: ShieldCheck,
+    settings: ShieldCheck,
+};
+
 export const productStatusOptions: ProductStatus[] = [
     "Active",
     "Inactive",
@@ -48,8 +60,12 @@ export const specIconOptions: {
     { value: "camera", label: "Camera" },
 ];
 
-export function getSpecIcon(icon: SpecIconKey): LucideIcon {
-    return SPEC_ICONS[icon];
+export function getSpecIcon(icon: string): LucideIcon {
+    return (
+        SPEC_ICONS[icon as SpecIconKey] ??
+        API_SPEC_ICON_ALIASES[icon] ??
+        Monitor
+    );
 }
 
 export function formatPrice(value: number): string {

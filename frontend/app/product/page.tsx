@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
+import { Search } from "lucide-react";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
@@ -10,6 +11,7 @@ import {
     addCartItem,
     fetchCatalogCategories,
     fetchProducts,
+    trackProductSearch,
     type ApiCategory,
     type ApiProduct,
     type PaginatedProductsResponse,
@@ -27,6 +29,7 @@ export default function ProductPage() {
     );
     const [selectedCategory, setSelectedCategory] = useState("");
     const [price, setPrice] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [sort, setSort] = useState("newest");
     const [page, setPage] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
@@ -64,6 +67,7 @@ export default function ProductPage() {
                 const response = await fetchProducts({
                     category: selectedCategory || null,
                     price: price || null,
+                    q: searchQuery || null,
                     sort: sort || null,
                     page,
                     perPage: 8,
@@ -90,11 +94,26 @@ export default function ProductPage() {
         return () => {
             mounted = false;
         };
-    }, [page, price, selectedCategory, sort]);
+    }, [page, price, searchQuery, selectedCategory, sort]);
+
+    useEffect(() => {
+        if (!user || searchQuery.trim().length < 2) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => {
+            void trackProductSearch(searchQuery.trim()).catch(() => {
+                // Search history is a recommendation signal; catalog browsing stays unaffected.
+            });
+        }, 700);
+
+        return () => window.clearTimeout(timeout);
+    }, [searchQuery, user]);
 
     const handleResetFilters = () => {
         setSelectedCategory("");
         setPrice("");
+        setSearchQuery("");
         setSort("newest");
         setPage(1);
     };
@@ -148,6 +167,28 @@ export default function ProductPage() {
                         </div>
 
                         <div className="min-w-0 flex-1">
+                            <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm shadow-blue-100/40">
+                                <label
+                                    htmlFor="product-search"
+                                    className="mb-2 block text-sm font-bold text-gray-950"
+                                >
+                                    Search Products
+                                </label>
+                                <div className="relative">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" />
+                                    <input
+                                        id="product-search"
+                                        value={searchQuery}
+                                        onChange={(event) => {
+                                            setSearchQuery(event.target.value);
+                                            setPage(1);
+                                        }}
+                                        placeholder="Cari laptop, mouse, keyboard, SSD..."
+                                        className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                                    />
+                                </div>
+                            </div>
+
                             <ProductGrid
                                 products={products}
                                 meta={meta}

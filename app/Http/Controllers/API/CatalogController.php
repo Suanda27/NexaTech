@@ -5,9 +5,12 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class CatalogController extends Controller
 {
@@ -52,6 +55,7 @@ class CatalogController extends Controller
         $validated = $request->validate([
             'category' => ['nullable', 'string'],
             'price' => ['nullable', 'in:lowest,highest'],
+            'q' => ['nullable', 'string', 'max:100'],
             'sort' => ['nullable', 'in:newest,best_selling,a_z'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:48'],
@@ -69,6 +73,22 @@ class CatalogController extends Controller
                     ->where('slug', $categoryFilter)
                     ->orWhere('nama_kategori', $categoryFilter)
                     ->orWhere('category_id', $categoryFilter);
+            });
+        }
+
+        if (!empty($validated['q'])) {
+            $keyword = trim($validated['q']);
+
+            $query->where(function ($searchQuery) use ($keyword) {
+                $searchQuery
+                    ->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('description', 'like', "%{$keyword}%")
+                    ->orWhere('sku', 'like', "%{$keyword}%")
+                    ->orWhereHas('category', function ($categoryQuery) use ($keyword) {
+                        $categoryQuery
+                            ->where('nama_kategori', 'like', "%{$keyword}%")
+                            ->orWhere('slug', 'like', "%{$keyword}%");
+                    });
             });
         }
 
@@ -103,6 +123,139 @@ class CatalogController extends Controller
         ]);
     }
 
+    public function publicRecommendations()
+    {
+        return response()->json([
+            'data' => $this->popularRecommendations(),
+        ]);
+    }
+
+    public function storeSearch(Request $request)
+    {
+        $validated = $request->validate([
+            'keyword' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        ProductSearch::query()->create([
+            'user_id' => $request->user()->id,
+            'keyword' => Str::lower(trim($validated['keyword'])),
+        ]);
+
+        return response()->json([
+            'message' => 'Pencarian disimpan.',
+        ], 201);
+    }
+
+    public function recommendations(Request $request)
+    {
+        $user = $request->user();
+
+        $purchasedProductIds = OrderItem::query()
+            ->whereHas('order', fn ($query) => $query->where('user_id', $user->id))
+            ->whereNotNull('product_id')
+            ->pluck('product_id')
+            ->unique()
+            ->values();
+
+        $purchasedProducts = Product::query()
+            ->with('category')
+            ->whereIn('id', $purchasedProductIds)
+            ->get();
+
+        $searchedKeywords = ProductSearch::query()
+            ->where('user_id', $user->id)
+            ->latest()
+            ->take(10)
+            ->pluck('keyword')
+            ->map(fn (string $keyword) => Str::lower(trim($keyword)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $products = Product::query()
+            ->with('category')
+            ->withSum('orderItems as sold_quantity', 'quantity')
+            ->where('status', Product::STATUS_ACTIVE)
+            ->whereNotIn('id', $purchasedProductIds)
+            ->get();
+
+        $purchasedCategoryIds = $purchasedProducts
+            ->pluck('category_id')
+            ->filter()
+            ->unique();
+        $hasLaptopPurchase = $purchasedProducts->contains(
+            fn (Product $product) => $this->matchesAnyKeyword($product, [
+                'laptop',
+                'notebook',
+                'macbook',
+            ]),
+        );
+
+        $rankedProducts = $products
+            ->map(function (Product $product) use (
+                $hasLaptopPurchase,
+                $purchasedCategoryIds,
+                $searchedKeywords
+            ) {
+                $score = (int) ($product->sold_quantity ?? 0);
+                $reason = 'Produk populer di katalog';
+
+                foreach ($searchedKeywords as $keyword) {
+                    if ($this->matchesAnyKeyword($product, [$keyword])) {
+                        $score += 60;
+                        $reason = "Sesuai pencarian Anda: {$keyword}";
+                        break;
+                    }
+                }
+
+                if ($purchasedCategoryIds->contains($product->category_id)) {
+                    $score += 35;
+                    $reason = 'Mirip dengan produk yang pernah dibeli';
+                }
+
+                if ($hasLaptopPurchase && $this->matchesAnyKeyword($product, [
+                    'accessories',
+                    'aksesoris',
+                    'accessory',
+                    'keyboard',
+                    'mouse',
+                    'mousepad',
+                    'monitor',
+                    'headset',
+                    'ssd',
+                    'storage',
+                ])) {
+                    $score += 85;
+                    $reason = 'Pelengkap laptop Anda';
+                }
+
+                return [
+                    'product' => $product,
+                    'score' => $score,
+                    'reason' => $reason,
+                ];
+            })
+            ->filter(fn (array $item) => $item['score'] > 0)
+            ->sortByDesc('score')
+            ->take(8)
+            ->values();
+
+        if ($rankedProducts->isEmpty()) {
+            return response()->json([
+                'data' => $this->popularRecommendations(),
+            ]);
+        }
+
+        return response()->json([
+            'data' => $rankedProducts
+                ->map(fn (array $item) => [
+                    ...$this->serializeProduct($item['product']),
+                    'recommendationReason' => $item['reason'],
+                ])
+                ->values(),
+        ]);
+    }
+
     public function show(Product $product)
     {
         if ($product->status !== Product::STATUS_ACTIVE) {
@@ -132,5 +285,43 @@ class CatalogController extends Controller
                     ->values(),
             ],
         ]);
+    }
+
+    private function popularRecommendations(int $limit = 8)
+    {
+        return Product::query()
+            ->with('category')
+            ->withSum('orderItems as sold_quantity', 'quantity')
+            ->where('status', Product::STATUS_ACTIVE)
+            ->orderByDesc('sold_quantity')
+            ->latest()
+            ->take($limit)
+            ->get()
+            ->map(fn (Product $product) => [
+                ...$this->serializeProduct($product),
+                'recommendationReason' => ((int) ($product->sold_quantity ?? 0)) > 0
+                    ? 'Produk terlaris'
+                    : 'Rekomendasi terbaru',
+            ])
+            ->values();
+    }
+
+    private function matchesAnyKeyword(Product $product, array $keywords): bool
+    {
+        $haystack = Str::lower(implode(' ', [
+            $product->name,
+            $product->description,
+            $product->sku,
+            $product->category?->nama_kategori,
+            $product->category?->slug,
+        ]));
+
+        foreach ($keywords as $keyword) {
+            if ($keyword !== '' && Str::contains($haystack, Str::lower($keyword))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

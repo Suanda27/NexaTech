@@ -159,7 +159,7 @@ export default function RegisterPage() {
                                     name="fullName"
                                     value={formData.fullName}
                                     onChange={handleChange}
-                                    placeholder="John Doe"
+                                    placeholder="Nama lengkap"
                                     required
                                     className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-12 pr-4 text-white placeholder-blue-200/30 outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
                                 />
