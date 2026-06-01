@@ -1,11 +1,17 @@
 "use client";
 
 export type OrderPaymentMethod = "Bank Transfer" | "COD";
-export type OrderPaymentStatus = "Paid" | "Unpaid";
+export type OrderPaymentStatus =
+    | "Waiting Payment"
+    | "Waiting Verification"
+    | "Paid"
+    | "Rejected"
+    | "Expired"
+    | "Unpaid";
 export type OrderStatus =
-    | "Progressing"
+    | "Pending"
+    | "Processing"
     | "Delivered"
-    | "Declined"
     | "Cancelled";
 
 export type OrderItem = {
@@ -29,10 +35,13 @@ export type OrderItemData = {
     orderNumber: string;
     customerName: string;
     orderDate: string;
+    paymentDeadline: string | null;
     paymentMethod: OrderPaymentMethod;
     paymentStatus: OrderPaymentStatus;
     status: OrderStatus;
     declineReason: string | null;
+    paymentRejectionReason: string | null;
+    cancellationReason: string | null;
     paymentProofImage: string | null;
     customer: CustomerAddress;
     items: OrderItem[];

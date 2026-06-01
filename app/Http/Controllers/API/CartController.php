@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Support\StoredImage;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
@@ -43,20 +44,24 @@ class CartController extends Controller
             ], 422);
         }
 
-        $quantity = min(
-            $validated['quantity'] ?? 1,
-            max($product->stock, 1),
-        );
+        $requestedQuantity = $validated['quantity'] ?? 1;
 
         $cartItem = CartItem::query()->firstOrNew([
             'user_id' => $request->user()->id,
             'product_id' => $product->id,
         ]);
 
-        $cartItem->quantity = min(
-            $cartItem->exists ? $cartItem->quantity + $quantity : $quantity,
-            max($product->stock, 1),
-        );
+        $nextQuantity = $cartItem->exists
+            ? $cartItem->quantity + $requestedQuantity
+            : $requestedQuantity;
+
+        if ($nextQuantity > $product->stock) {
+            return response()->json([
+                'message' => "Stok {$product->name} tidak cukup. Tersisa {$product->stock} unit.",
+            ], 422);
+        }
+
+        $cartItem->quantity = $nextQuantity;
         $cartItem->save();
 
         return response()->json($this->buildCartResponse($request->user()->id));
@@ -85,7 +90,13 @@ class CartController extends Controller
             return response()->json($this->buildCartResponse($request->user()->id));
         }
 
-        $cartItem->quantity = min($validated['quantity'], max($product->stock, 1));
+        if ($validated['quantity'] > $product->stock) {
+            return response()->json([
+                'message' => "Stok {$product->name} tidak cukup. Tersisa {$product->stock} unit.",
+            ], 422);
+        }
+
+        $cartItem->quantity = $validated['quantity'];
         $cartItem->save();
 
         return response()->json($this->buildCartResponse($request->user()->id));
@@ -131,7 +142,7 @@ class CartController extends Controller
                 'name' => $product->name,
                 'price' => (int) $product->price,
                 'qty' => (int) $item->quantity,
-                'image' => $product->image_url,
+                'image' => StoredImage::toPublicUrl($product->image_url),
                 'category' => $product->category?->nama_kategori,
                 'stock' => (int) $product->stock,
             ];

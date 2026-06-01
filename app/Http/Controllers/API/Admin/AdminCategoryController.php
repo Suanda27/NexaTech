@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Admin;
 use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\StoredImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -52,7 +53,10 @@ class AdminCategoryController extends Controller
             'nama_kategori' => $validated['name'],
             'slug' => $this->makeUniqueSlug($validated['name']),
             'deskripsi' => $validated['description'] ?? null,
-            'image_url' => $validated['image_url'] ?? null,
+            'image_url' => StoredImage::sync(
+                $validated['image_url'] ?? null,
+                'catalog/categories',
+            ),
             'is_active' => $validated['status'] === 'active',
         ]);
 
@@ -82,7 +86,11 @@ class AdminCategoryController extends Controller
             'nama_kategori' => $validated['name'],
             'slug' => $this->makeUniqueSlug($validated['name'], $category->category_id),
             'deskripsi' => $validated['description'] ?? null,
-            'image_url' => $validated['image_url'] ?? null,
+            'image_url' => StoredImage::sync(
+                $validated['image_url'] ?? null,
+                'catalog/categories',
+                $category->image_url,
+            ),
             'is_active' => $validated['status'] === 'active',
         ]);
 

@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductSpecification;
+use App\Support\StoredImage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -23,7 +24,7 @@ trait SerializesStoreData
             'name' => $category->nama_kategori,
             'slug' => $category->slug,
             'description' => $category->deskripsi,
-            'imageUrl' => $category->image_url,
+            'imageUrl' => StoredImage::toPublicUrl($category->image_url),
             'status' => $category->is_active ? 'Active' : 'Inactive',
             'statusKey' => $category->is_active ? 'active' : 'inactive',
             'totalProducts' => $totalProducts,
@@ -45,9 +46,11 @@ trait SerializesStoreData
             'rating' => (int) $product->rating,
             'description' => $product->description ?? '',
             'stock' => (int) $product->stock,
+            'isLowStock' => $product->isLowStock(),
+            'isOutOfStock' => $product->isOutOfStock(),
             'status' => $this->productStatusLabel($product->status),
             'statusKey' => $product->status,
-            'imageUrl' => $product->image_url,
+            'imageUrl' => StoredImage::toPublicUrl($product->image_url),
         ];
 
         if ($includeSpecs) {
@@ -81,7 +84,7 @@ trait SerializesStoreData
                 'id' => (string) $item->id,
                 'productId' => $item->product_id,
                 'productName' => $item->product_name,
-                'productImage' => $item->product_image_url,
+                'productImage' => StoredImage::toPublicUrl($item->product_image_url),
                 'quantity' => (int) $item->quantity,
                 'unitPrice' => (int) $item->unit_price,
                 'totalPrice' => (int) $item->total_price,
@@ -90,23 +93,26 @@ trait SerializesStoreData
             ->all();
     }
 
-    protected function serializeOrder(Order $order): array
+    protected function serializeOrder(Order $order, bool $includePaymentProof = true): array
     {
         $order->loadMissing('items');
 
-        return [
+        $payload = [
             'id' => (string) $order->id,
             'orderNumber' => $order->order_number,
             'customerName' => trim("{$order->first_name} {$order->last_name}"),
             'orderDate' => optional($order->ordered_at ?? $order->created_at)?->format('d M Y'),
+            'paymentDeadline' => optional($order->expires_at)?->format('d M Y H:i'),
+            'paymentExpiresAt' => optional($order->expires_at)?->toIso8601String(),
             'paymentMethod' => $this->paymentMethodLabel($order->payment_method),
             'paymentMethodKey' => $order->payment_method,
             'paymentStatus' => $this->paymentStatusLabel($order->payment_status),
             'paymentStatusKey' => $order->payment_status,
             'status' => $this->orderStatusLabel($order->status),
             'statusKey' => $order->status,
-            'declineReason' => $order->decline_reason,
-            'paymentProofImage' => $order->payment_proof,
+            'declineReason' => $order->payment_rejection_reason ?? $order->cancellation_reason ?? $order->decline_reason,
+            'paymentRejectionReason' => $order->payment_rejection_reason,
+            'cancellationReason' => $order->cancellation_reason,
             'customer' => [
                 'firstName' => $order->first_name,
                 'lastName' => $order->last_name,
@@ -126,6 +132,12 @@ trait SerializesStoreData
             ],
             'items' => $this->serializeOrderItems($order->items),
         ];
+
+        if ($includePaymentProof) {
+            $payload['paymentProofImage'] = $order->paymentProofUrl();
+        }
+
+        return $payload;
     }
 
     protected function paymentMethodLabel(string $paymentMethod): string
@@ -137,18 +149,24 @@ trait SerializesStoreData
 
     protected function paymentStatusLabel(string $paymentStatus): string
     {
-        return $paymentStatus === Order::PAYMENT_STATUS_PAID
-            ? 'Paid'
-            : 'Unpaid';
+        return match ($paymentStatus) {
+            Order::PAYMENT_STATUS_WAITING_PAYMENT => 'Waiting Payment',
+            Order::PAYMENT_STATUS_WAITING_VERIFICATION => 'Waiting Verification',
+            Order::PAYMENT_STATUS_PAID => 'Paid',
+            Order::PAYMENT_STATUS_REJECTED => 'Rejected',
+            Order::PAYMENT_STATUS_EXPIRED => 'Expired',
+            default => 'Unpaid',
+        };
     }
 
     protected function orderStatusLabel(string $status): string
     {
         return match ($status) {
+            Order::STATUS_PENDING => 'Pending',
+            Order::STATUS_PROCESSING => 'Processing',
             Order::STATUS_DELIVERED => 'Delivered',
-            Order::STATUS_DECLINED => 'Declined',
             Order::STATUS_CANCELLED => 'Cancelled',
-            default => 'Progressing',
+            default => 'Pending',
         };
     }
 

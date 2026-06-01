@@ -11,6 +11,8 @@ class ProfileController extends Controller
 {
     public function show(Request $request)
     {
+        Order::expirePendingTransferPayments();
+
         $user = $request->user();
 
         $orders = Order::query()
@@ -29,9 +31,12 @@ class ProfileController extends Controller
                 ],
                 'summary' => [
                     'totalOrders' => $orders->count(),
-                    'progressingOrders' => $orders->where('status', Order::STATUS_PROGRESSING)->count(),
+                    'progressingOrders' => $orders->whereIn('status', [
+                        Order::STATUS_PENDING,
+                        Order::STATUS_PROCESSING,
+                    ])->count(),
                     'deliveredOrders' => $orders->where('status', Order::STATUS_DELIVERED)->count(),
-                    'declinedOrders' => $orders->where('status', Order::STATUS_DECLINED)->count(),
+                    'declinedOrders' => $orders->where('payment_status', Order::PAYMENT_STATUS_REJECTED)->count(),
                     'cancelledOrders' => $orders->where('status', Order::STATUS_CANCELLED)->count(),
                 ],
             ],

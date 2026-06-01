@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Support\StoredImage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
     public function index()
     {
+        Order::expirePendingTransferPayments();
+        $monthKeyExpression = $this->monthKeyExpression();
+
         $totalRevenue = Order::query()
             ->where('status', Order::STATUS_DELIVERED)
             ->sum('total');
@@ -32,7 +37,7 @@ class AdminDashboardController extends Controller
         });
 
         $orderGroups = Order::query()
-            ->selectRaw("DATE_FORMAT(COALESCE(ordered_at, created_at), '%Y-%m') as month_key")
+            ->selectRaw("{$monthKeyExpression} as month_key")
             ->selectRaw('SUM(total) as revenue')
             ->selectRaw('COUNT(*) as orders')
             ->groupBy('month_key')
@@ -61,7 +66,7 @@ class AdminDashboardController extends Controller
                 return [
                     'rank' => $index + 1,
                     'name' => $item->product_name,
-                    'imageUrl' => $item->product_image_url,
+                    'imageUrl' => StoredImage::toPublicUrl($item->product_image_url),
                     'soldUnits' => (int) $item->sold_units,
                     'revenue' => (int) $item->revenue,
                 ];
@@ -82,5 +87,13 @@ class AdminDashboardController extends Controller
                 'topProducts' => $topProducts,
             ],
         ]);
+    }
+
+    protected function monthKeyExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', COALESCE(ordered_at, created_at))",
+            default => "DATE_FORMAT(COALESCE(ordered_at, created_at), '%Y-%m')",
+        };
     }
 }

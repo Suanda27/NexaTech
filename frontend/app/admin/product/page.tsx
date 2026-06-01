@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+    AlertTriangle,
     Boxes,
     CircleDollarSign,
     PackagePlus,
+    Siren,
     Search,
     Sparkles,
 } from "lucide-react";
@@ -42,6 +44,8 @@ function normalizeProduct(item: {
     description: string;
     stock: number;
     status: string;
+    isLowStock?: boolean;
+    isOutOfStock?: boolean;
     imageUrl: string | null;
     specs?: Array<{
         id: string;
@@ -61,6 +65,8 @@ function normalizeProduct(item: {
         rating: item.rating,
         description: item.description,
         stock: item.stock,
+        isLowStock: item.isLowStock ?? false,
+        isOutOfStock: item.isOutOfStock ?? false,
         status: item.status as ProductItem["status"],
         imageUrl: item.imageUrl,
         specs:
@@ -82,6 +88,8 @@ export default function ProductPage() {
         totalInventoryValue: 0,
         totalStock: 0,
         activeProducts: 0,
+        lowStockProducts: 0,
+        outOfStockProducts: 0,
     });
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("Semua Kategori");
@@ -113,12 +121,57 @@ export default function ProductPage() {
                 totalInventoryValue: 0,
                 totalStock: 0,
                 activeProducts: 0,
+                lowStockProducts: 0,
+                outOfStockProducts: 0,
             });
         }
     };
 
     useEffect(() => {
-        void loadData();
+        let mounted = true;
+
+        const bootstrapData = async () => {
+            try {
+                const [productsResponse, categoriesResponse] = await Promise.all([
+                    fetchAdminProducts(),
+                    fetchAdminCategories(),
+                ]);
+
+                if (!mounted) {
+                    return;
+                }
+
+                setProducts(productsResponse.data.map(normalizeProduct));
+                setSummary(productsResponse.summary);
+                setCategoryLookup(
+                    categoriesResponse.data.map((category) => ({
+                        id: category.id,
+                        name: category.name,
+                    })),
+                );
+            } catch {
+                if (!mounted) {
+                    return;
+                }
+
+                setProducts([]);
+                setCategoryLookup([]);
+                setSummary({
+                    totalProducts: 0,
+                    totalInventoryValue: 0,
+                    totalStock: 0,
+                    activeProducts: 0,
+                    lowStockProducts: 0,
+                    outOfStockProducts: 0,
+                });
+            }
+        };
+
+        void bootstrapData();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const categories = useMemo(
@@ -149,6 +202,11 @@ export default function ProductPage() {
     );
     const totalStock = useMemo(() => summary.totalStock, [summary]);
     const activeProducts = useMemo(() => summary.activeProducts, [summary]);
+    const lowStockProducts = useMemo(() => summary.lowStockProducts, [summary]);
+    const outOfStockProducts = useMemo(
+        () => summary.outOfStockProducts,
+        [summary],
+    );
 
     const resolveCategoryId = (categoryName: string) =>
         categoryLookup.find((category) => category.name === categoryName)?.id ?? null;
@@ -319,6 +377,42 @@ export default function ProductPage() {
             </section>
 
             <section className="mt-6 rounded-lg border border-blue-100 bg-white p-5 shadow-[0_20px_50px_-38px_rgba(37,99,235,0.55)] sm:p-6">
+                {(outOfStockProducts > 0 || lowStockProducts > 0) && (
+                    <div className="mb-6 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-lg border border-red-200 bg-red-50/80 p-4">
+                            <div className="flex items-start gap-3">
+                                <Siren className="mt-0.5 h-5 w-5 text-red-600" />
+                                <div>
+                                    <p className="text-sm font-semibold text-red-700">
+                                        Produk stok habis
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6 text-red-700">
+                                        {outOfStockProducts} produk sudah habis dan
+                                        customer tidak bisa checkout sampai stok
+                                        diperbarui.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+                                <div>
+                                    <p className="text-sm font-semibold text-amber-700">
+                                        Produk stok menipis
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6 text-amber-700">
+                                        {lowStockProducts} produk tinggal sedikit.
+                                        Bagus untuk segera restock sebelum order
+                                        baru masuk.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-medium text-blue-700">

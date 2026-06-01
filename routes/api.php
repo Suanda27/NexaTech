@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
+    Route::post('/orders/{order}/payment-proof', [OrderController::class, 'submitPaymentProof']);
 
     Route::post('/product-searches', [CatalogController::class, 'storeSearch']);
     Route::get('/recommendations', [CatalogController::class, 'recommendations']);
@@ -61,5 +62,6 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::delete('/products/{product}', [AdminProductController::class, 'destroy']);
 
     Route::get('/orders', [AdminOrderController::class, 'index']);
+    Route::get('/orders/{order}', [AdminOrderController::class, 'show']);
     Route::patch('/orders/{order}', [AdminOrderController::class, 'update']);
 });

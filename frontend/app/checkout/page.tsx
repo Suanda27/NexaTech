@@ -8,7 +8,6 @@ import {
     Banknote,
     CreditCard,
     Home,
-    ImagePlus,
     Mail,
     MapPin,
     PackageCheck,
@@ -22,7 +21,7 @@ import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
 import AuthGuard from "@/app/components/auth/AuthGuard";
-import { fileToDataUrl } from "@/app/admin/category/utils";
+import { OrderPaymentGuide } from "@/app/components/profile/OrderAlert";
 import {
     createOrder,
     fetchCart,
@@ -38,7 +37,6 @@ export default function CheckoutPage() {
         "bank_transfer",
     );
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [cart, setCart] = useState<CartResponse>({
         items: [],
         summary: {
@@ -111,18 +109,23 @@ export default function CheckoutPage() {
         setIsSubmitting(true);
 
         try {
-            await createOrder({
+            const response = await createOrder({
                 first_name: form.firstName,
                 last_name: form.lastName,
                 address: form.address,
                 city: form.city,
                 postal_code: form.postalCode,
                 payment_method: payment,
-                payment_proof: paymentProof,
             });
 
             await refreshCartCount();
-            alert("Order berhasil dibuat.");
+            const deadlineMessage =
+                response.data.paymentMethodKey === "bank_transfer" &&
+                response.data.paymentDeadline
+                    ? ` Upload bukti pembayaran sebelum ${response.data.paymentDeadline} dari halaman order Anda.`
+                    : "";
+
+            alert(`Order berhasil dibuat.${deadlineMessage}`);
             router.push("/profile?tab=orders");
         } catch (error) {
             alert(error instanceof Error ? error.message : "Gagal membuat order.");
@@ -131,37 +134,29 @@ export default function CheckoutPage() {
         }
     };
 
-    const handlePaymentProofChange = async (
-        event: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-        const file = event.target.files?.[0];
-
-        if (!file) {
-            return;
-        }
-
-        try {
-            const dataUrl = await fileToDataUrl(file);
-            setPaymentProof(dataUrl);
-        } finally {
-            event.target.value = "";
-        }
-    };
-
     const paymentMethods = [
         {
             id: "bank_transfer" as const,
             title: "Bank Transfer",
-            description: "Upload payment proof before placing your order.",
+            description:
+                "Checkout dulu, lalu upload bukti pembayaran dari halaman order sebelum deadline berakhir.",
             icon: CreditCard,
         },
         {
             id: "cod" as const,
             title: "Cash on Delivery",
-            description: "Pay directly when the courier arrives.",
+            description: "COD hanya tersedia untuk total belanja sampai Rp 300.000.",
             icon: Banknote,
         },
     ];
+
+    const isCodAllowed = cart.summary.total <= 300000;
+
+    useEffect(() => {
+        if (!isCodAllowed && payment === "cod") {
+            setPayment("bank_transfer");
+        }
+    }, [isCodAllowed, payment]);
 
     const inputClass =
         "w-full rounded-lg border border-gray-200 bg-white py-3 pl-11 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
@@ -181,8 +176,9 @@ export default function CheckoutPage() {
                                 Complete Your Order
                             </h1>
                             <p className="mt-2 text-sm text-gray-500">
-                                Checkout ini sekarang membaca cart dan membuat
-                                order langsung ke backend.
+                                Order transfer akan menunggu pembayaran lebih
+                                dulu, lalu diverifikasi admin setelah customer
+                                mengupload bukti transfer.
                             </p>
                         </div>
 
@@ -326,11 +322,18 @@ export default function CheckoutPage() {
                                                     isActive
                                                         ? "border-blue-300 bg-blue-50 shadow-lg shadow-blue-100"
                                                         : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/60"
+                                                } ${
+                                                    method.id === "cod" && !isCodAllowed
+                                                        ? "cursor-not-allowed opacity-60"
+                                                        : ""
                                                 }`}
                                             >
                                                 <input
                                                     type="radio"
                                                     checked={isActive}
+                                                    disabled={
+                                                        method.id === "cod" && !isCodAllowed
+                                                    }
                                                     onChange={() => setPayment(method.id)}
                                                     className="sr-only"
                                                 />
@@ -366,47 +369,7 @@ export default function CheckoutPage() {
 
                                 {payment === "bank_transfer" && (
                                     <div className="border-t border-blue-100 p-5 sm:p-6">
-                                        <label className="text-sm font-medium text-slate-700">
-                                            Bukti Pembayaran
-                                        </label>
-
-                                        <div className="mt-3 grid gap-4 sm:grid-cols-[132px_minmax(0,1fr)]">
-                                            <div className="flex h-32 items-center justify-center overflow-hidden rounded-lg border border-dashed border-blue-200 bg-blue-50/60">
-                                                {paymentProof ? (
-                                                    <img
-                                                        src={paymentProof}
-                                                        alt="Preview bukti pembayaran"
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-2 text-center text-blue-700">
-                                                        <ImagePlus className="mx-auto h-5 w-5" />
-                                                        <p className="text-xs font-medium">
-                                                            Belum ada gambar
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50">
-                                                    <ImagePlus className="h-4 w-4" />
-                                                    Upload Bukti
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        className="hidden"
-                                                        onChange={handlePaymentProofChange}
-                                                    />
-                                                </label>
-
-                                                <p className="text-sm leading-6 text-slate-500">
-                                                    Bukti ini akan tampil di panel
-                                                    admin saat order transfer bank
-                                                    diperiksa.
-                                                </p>
-                                            </div>
-                                        </div>
+                                        <OrderPaymentGuide />
                                     </div>
                                 )}
                             </section>
@@ -504,8 +467,7 @@ export default function CheckoutPage() {
                                         type="submit"
                                         disabled={
                                             isSubmitting ||
-                                            cart.items.length === 0 ||
-                                            (payment === "bank_transfer" && !paymentProof)
+                                            cart.items.length === 0
                                         }
                                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
                                     >

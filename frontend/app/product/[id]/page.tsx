@@ -61,7 +61,7 @@ export default function ProductDetailPage() {
     }, [id]);
 
     const handleAddToCart = async () => {
-        if (!product) {
+        if (!product || product.stock <= 0) {
             return;
         }
 
@@ -175,6 +175,11 @@ export default function ProductDetailPage() {
                                                     ? "In Stock"
                                                     : "Out of Stock"}
                                             </span>
+                                            {product.stock > 0 && product.stock <= 10 && (
+                                                <span className="rounded-lg bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
+                                                    Tersisa {product.stock} unit
+                                                </span>
+                                            )}
                                         </div>
 
                                         <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
@@ -236,10 +241,13 @@ export default function ProductDetailPage() {
                                         <button
                                             type="button"
                                             onClick={handleAddToCart}
-                                            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200"
+                                            disabled={product.stock <= 0}
+                                            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                                         >
                                             <ShoppingCart className="h-5 w-5" />
-                                            Add to Cart
+                                            {product.stock > 0
+                                                ? "Add to Cart"
+                                                : "Stok Habis"}
                                         </button>
 
                                         <button

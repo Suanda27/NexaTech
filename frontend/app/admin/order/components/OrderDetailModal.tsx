@@ -13,7 +13,8 @@ import {
     UserRound,
     X,
 } from "lucide-react";
-import type { OrderItemData, OrderStatus } from "../types";
+import { fetchAdminOrderDetail, type OrderData } from "@/lib/store";
+import type { OrderItemData, OrderPaymentStatus, OrderStatus } from "../types";
 import {
     formatPrice,
     getOrderTotal,
@@ -21,6 +22,31 @@ import {
     getPaymentStatusClasses,
     getStatusClasses,
 } from "../utils";
+
+function mapOrderDetail(item: OrderData): OrderItemData {
+    return {
+        id: item.id,
+        orderNumber: item.orderNumber,
+        customerName: item.customerName,
+        orderDate: item.orderDate ?? "-",
+        paymentDeadline: item.paymentDeadline,
+        paymentMethod: item.paymentMethod as OrderItemData["paymentMethod"],
+        paymentStatus: item.paymentStatus as OrderItemData["paymentStatus"],
+        status: item.status as OrderItemData["status"],
+        declineReason: item.declineReason,
+        paymentRejectionReason: item.paymentRejectionReason,
+        cancellationReason: item.cancellationReason,
+        paymentProofImage: item.paymentProofImage ?? null,
+        customer: item.customer,
+        items: item.items.map((orderItem) => ({
+            id: orderItem.id,
+            productName: orderItem.productName,
+            productImage: orderItem.productImage,
+            quantity: orderItem.quantity,
+            unitPrice: orderItem.unitPrice,
+        })),
+    };
+}
 
 type OrderDetailModalProps = {
     isOpen: boolean;
@@ -31,7 +57,11 @@ type OrderDetailModalProps = {
         updates: Partial<
             Pick<
                 OrderItemData,
-                "status" | "paymentStatus" | "declineReason"
+                | "status"
+                | "paymentStatus"
+                | "declineReason"
+                | "paymentRejectionReason"
+                | "cancellationReason"
             >
         >,
     ) => void;
@@ -43,54 +73,141 @@ export default function OrderDetailModal({
     onClose,
     onUpdateOrder,
 }: OrderDetailModalProps) {
-    const [declineReason, setDeclineReason] = useState("");
-
-    useEffect(() => {
-        setDeclineReason(order?.declineReason ?? "");
-    }, [order]);
-
-    const total = useMemo(
-        () => (order ? getOrderTotal(order.items) : 0),
-        [order],
+    const [detailOrder, setDetailOrder] = useState<OrderItemData | null>(order);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [paymentRejectionReason, setPaymentRejectionReason] = useState(
+        order?.paymentRejectionReason ?? "",
+    );
+    const [cancellationReason, setCancellationReason] = useState(
+        order?.cancellationReason ?? "",
     );
 
-    if (!isOpen || !order) {
+    useEffect(() => {
+        setDetailOrder(order);
+        setPaymentRejectionReason(order?.paymentRejectionReason ?? "");
+        setCancellationReason(order?.cancellationReason ?? "");
+    }, [
+        order,
+        order?.id,
+        order?.paymentDeadline,
+        order?.paymentMethod,
+        order?.paymentStatus,
+        order?.status,
+        order?.paymentRejectionReason,
+        order?.cancellationReason,
+    ]);
+
+    useEffect(() => {
+        if (!isOpen || !order) {
+            return;
+        }
+
+        let active = true;
+
+        const loadOrderDetail = async () => {
+            setIsDetailLoading(true);
+
+            try {
+                const response = await fetchAdminOrderDetail(order.id);
+
+                if (!active) {
+                    return;
+                }
+
+                const mappedOrder = mapOrderDetail(response.data);
+                setDetailOrder(mappedOrder);
+                setPaymentRejectionReason(
+                    mappedOrder.paymentRejectionReason ?? "",
+                );
+                setCancellationReason(mappedOrder.cancellationReason ?? "");
+            } catch {
+                if (!active) {
+                    return;
+                }
+
+                setDetailOrder(order);
+            } finally {
+                if (active) {
+                    setIsDetailLoading(false);
+                }
+            }
+        };
+
+        void loadOrderDetail();
+
+        return () => {
+            active = false;
+        };
+    }, [
+        isOpen,
+        order,
+        order?.id,
+        order?.paymentStatus,
+        order?.status,
+        order?.paymentRejectionReason,
+        order?.cancellationReason,
+    ]);
+
+    const currentOrder = detailOrder ?? order;
+
+    const total = useMemo(
+        () => (currentOrder ? getOrderTotal(currentOrder.items) : 0),
+        [currentOrder],
+    );
+
+    if (!isOpen || !currentOrder) {
         return null;
     }
 
-    const canCancel = order.status === "Progressing";
-    const canDecline = order.status === "Progressing";
+    const canApprovePayment =
+        currentOrder.paymentMethod === "Bank Transfer" &&
+        currentOrder.paymentStatus === "Waiting Verification";
+    const canRejectPayment =
+        currentOrder.paymentMethod === "Bank Transfer" &&
+        currentOrder.paymentStatus === "Waiting Verification";
+    const canCancel =
+        currentOrder.status !== "Delivered" &&
+        currentOrder.status !== "Cancelled" &&
+        currentOrder.paymentStatus !== "Expired";
     const canDeliver =
-        order.status === "Progressing" &&
-        (order.paymentMethod === "COD" ||
-            order.paymentStatus === "Paid" ||
-            Boolean(order.paymentProofImage));
+        currentOrder.status === "Processing" &&
+        (currentOrder.paymentMethod === "COD" ||
+            currentOrder.paymentStatus === "Paid");
 
-    const handleStatusUpdate = (status: OrderStatus) => {
-        if (status === "Declined") {
-            const reason = declineReason.trim() || "Payment could not be verified.";
+    const handleStatusUpdate = (
+        status?: OrderStatus,
+        paymentStatus?: OrderPaymentStatus,
+    ) => {
+        if (paymentStatus === "Rejected") {
+            const reason =
+                paymentRejectionReason.trim() ||
+                "Payment could not be verified.";
 
-            onUpdateOrder(order.id, {
-                status,
-                declineReason: reason,
+            onUpdateOrder(currentOrder.id, {
+                paymentStatus,
+                paymentRejectionReason: reason,
+            });
+            return;
+        }
+
+        if (paymentStatus === "Paid") {
+            onUpdateOrder(currentOrder.id, {
+                paymentStatus,
             });
             return;
         }
 
         if (status === "Cancelled") {
-            onUpdateOrder(order.id, {
+            onUpdateOrder(currentOrder.id, {
                 status,
+                cancellationReason: cancellationReason.trim() || null,
             });
             return;
         }
 
         if (status === "Delivered") {
-            onUpdateOrder(order.id, {
+            onUpdateOrder(currentOrder.id, {
                 status,
-                paymentStatus:
-                    order.paymentMethod === "Bank Transfer"
-                        ? "Paid"
-                        : order.paymentStatus,
             });
         }
     };
@@ -110,35 +227,41 @@ export default function OrderDetailModal({
                             Order Detail
                         </p>
                         <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-                            {order.orderNumber}
+                            {currentOrder.orderNumber}
                         </h2>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-3 flex flex-wrap gap-2">
                             <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                                {order.customerName}
+                                {currentOrder.customerName}
                             </span>
                             <span
                                 className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${getPaymentMethodClasses(
-                                    order.paymentMethod,
+                                    currentOrder.paymentMethod,
                                 )}`}
                             >
-                                {order.paymentMethod}
+                                {currentOrder.paymentMethod}
                             </span>
                             <span
                                 className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${getPaymentStatusClasses(
-                                    order.paymentStatus,
+                                    currentOrder.paymentStatus,
                                 )}`}
                             >
-                                {order.paymentStatus}
+                                {currentOrder.paymentStatus}
                             </span>
                             <span
                                 className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${getStatusClasses(
-                                    order.status,
+                                    currentOrder.status,
                                 )}`}
                             >
-                                {order.status}
+                                {currentOrder.status}
                             </span>
+                            </div>
+                            {currentOrder.paymentMethod === "Bank Transfer" &&
+                                currentOrder.paymentDeadline && (
+                                    <p className="mt-3 text-sm font-medium text-amber-700">
+                                        Deadline pembayaran: {currentOrder.paymentDeadline}
+                                    </p>
+                                )}
                         </div>
-                    </div>
 
                     <button
                         type="button"
@@ -167,8 +290,8 @@ export default function OrderDetailModal({
                                     Customer Name
                                 </div>
                                 <p className="mt-3 text-sm text-slate-600">
-                                    {order.customer.firstName}{" "}
-                                    {order.customer.lastName}
+                                    {currentOrder.customer.firstName}{" "}
+                                    {currentOrder.customer.lastName}
                                 </p>
                             </div>
 
@@ -178,7 +301,7 @@ export default function OrderDetailModal({
                                     Payment Method
                                 </div>
                                 <p className="mt-3 text-sm text-slate-600">
-                                    {order.paymentMethod}
+                                    {currentOrder.paymentMethod}
                                 </p>
                             </div>
 
@@ -188,10 +311,10 @@ export default function OrderDetailModal({
                                     Shipping Address
                                 </div>
                                 <div className="mt-3 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                                    <p>{order.customer.address}</p>
+                                    <p>{currentOrder.customer.address}</p>
                                     <div className="space-y-1">
-                                        <p>City: {order.customer.city}</p>
-                                        <p>Postal Code: {order.customer.postalCode}</p>
+                                        <p>City: {currentOrder.customer.city}</p>
+                                        <p>Postal Code: {currentOrder.customer.postalCode}</p>
                                     </div>
                                 </div>
                             </div>
@@ -208,12 +331,12 @@ export default function OrderDetailModal({
                                     </h3>
                                 </div>
                                 <p className="text-sm text-slate-500">
-                                    Ordered on {order.orderDate}
+                                    Ordered on {currentOrder.orderDate}
                                 </p>
                             </div>
 
                             <div className="mt-5 space-y-3">
-                                {order.items.map((item) => (
+                                {currentOrder.items.map((item) => (
                                     <div
                                         key={item.id}
                                         className="grid gap-4 rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 md:grid-cols-[88px_minmax(0,1fr)_150px]"
@@ -262,7 +385,7 @@ export default function OrderDetailModal({
                                         Payment Detail
                                     </p>
                                     <p className="mt-2 text-sm text-slate-200">
-                                        {order.paymentMethod}
+                                        {currentOrder.paymentMethod}
                                     </p>
                                 </div>
                                 <div>
@@ -270,7 +393,7 @@ export default function OrderDetailModal({
                                         Payment Status
                                     </p>
                                     <p className="mt-2 text-sm text-slate-200">
-                                        {order.paymentStatus}
+                                        {currentOrder.paymentStatus}
                                     </p>
                                 </div>
                                 <div>
@@ -284,14 +407,15 @@ export default function OrderDetailModal({
                             </div>
                         </section>
 
-                        {order.status === "Declined" && (
+                        {currentOrder.paymentStatus === "Rejected" &&
+                            !currentOrder.cancellationReason && (
                             <section className="rounded-lg border border-red-100 bg-red-50/70 p-5">
                                 <div className="flex items-center gap-2 text-sm font-semibold text-red-700">
                                     <ShieldAlert className="h-4 w-4" />
-                                    Order Declined
+                                    Payment Rejected
                                 </div>
                                 <p className="mt-3 text-sm leading-7 text-red-700">
-                                    {order.declineReason}
+                                    {currentOrder.paymentRejectionReason}
                                 </p>
                             </section>
                         )}
@@ -304,14 +428,18 @@ export default function OrderDetailModal({
                                 Bukti Pembayaran
                             </div>
 
-                            {order.paymentMethod === "Bank Transfer" ? (
-                                order.paymentProofImage ? (
+                            {currentOrder.paymentMethod === "Bank Transfer" ? (
+                                currentOrder.paymentProofImage ? (
                                     <div className="mt-4 overflow-hidden rounded-lg border border-blue-100 bg-blue-50">
                                         <img
-                                            src={order.paymentProofImage}
-                                            alt={`Payment proof ${order.orderNumber}`}
+                                            src={currentOrder.paymentProofImage}
+                                            alt={`Payment proof ${currentOrder.orderNumber}`}
                                             className="aspect-[4/3] w-full object-cover"
                                         />
+                                    </div>
+                                ) : isDetailLoading ? (
+                                    <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-10 text-center text-sm text-slate-500">
+                                        Memuat bukti pembayaran...
                                     </div>
                                 ) : (
                                     <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-10 text-center text-sm text-slate-500">
@@ -331,58 +459,109 @@ export default function OrderDetailModal({
                                 Order Action
                             </div>
                             <p className="mt-2 text-sm leading-6 text-slate-500">
-                                {order.status === "Progressing"
-                                    ? "Order masih berada pada tahap processing. Admin dapat menyelesaikan, menolak, atau membatalkan order sesuai aturan pembayaran."
-                                    : "Order ini sudah final dan tidak dapat dibatalkan lagi dari panel admin."}
+                                {currentOrder.status === "Delivered" ||
+                                currentOrder.status === "Cancelled" ||
+                                currentOrder.paymentStatus === "Expired"
+                                    ? "Order ini sudah final dan tidak dapat diproses lebih lanjut dari panel admin."
+                                    : "Gunakan blok konfirmasi pembayaran untuk approve atau reject transfer, lalu blok cancel jika order memang harus dibatalkan dari sisi admin."}
                             </p>
 
-                            {canDecline && (
-                                <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
-                                    <label className="text-sm font-medium text-slate-700">
-                                        Alasan Penolakan
+                            <div className="mt-5 space-y-4">
+                                <div className="rounded-lg border border-blue-100 bg-white p-4">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        Konfirmasi Pembayaran
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                                        Approve pembayaran yang valid atau kirim komentar reject ke customer jika bukti transfer tidak sesuai.
+                                    </p>
+
+                                    <label className="mt-4 block text-sm font-medium text-slate-700">
+                                        Komentar Reject Pembayaran
                                     </label>
                                     <textarea
                                         rows={4}
-                                        value={declineReason}
+                                        value={paymentRejectionReason}
                                         onChange={(event) =>
-                                            setDeclineReason(event.target.value)
+                                            setPaymentRejectionReason(
+                                                event.target.value,
+                                            )
                                         }
-                                        placeholder="Tulis alasan kenapa order ditolak oleh admin."
+                                        placeholder="Tulis alasan kenapa bukti pembayaran ditolak oleh admin."
                                         className="mt-2 w-full rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                                     />
+
+                                    <div className="mt-4 grid gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleStatusUpdate(undefined, "Paid")
+                                            }
+                                            disabled={!canApprovePayment}
+                                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <BadgeCheck className="h-4 w-4" />
+                                            Approve Payment
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleStatusUpdate(undefined, "Rejected")
+                                            }
+                                            disabled={!canRejectPayment}
+                                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <ShieldAlert className="h-4 w-4" />
+                                            Reject Payment
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
 
-                            <div className="mt-5 grid gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => handleStatusUpdate("Delivered")}
-                                    disabled={!canDeliver}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <BadgeCheck className="h-4 w-4" />
-                                    Mark as Delivered
-                                </button>
+                                <div className="rounded-lg border border-blue-100 bg-white p-4">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        Cancel Order
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                                        Gunakan cancel order hanya jika pesanan memang harus dibatalkan dari sisi admin. Alasan ini akan dikirim ke customer.
+                                    </p>
 
-                                <button
-                                    type="button"
-                                    onClick={() => handleStatusUpdate("Declined")}
-                                    disabled={!canDecline}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <ShieldAlert className="h-4 w-4" />
-                                    Decline Order
-                                </button>
+                                    <label className="mt-4 block text-sm font-medium text-slate-700">
+                                        Alasan Cancel Order
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        value={cancellationReason}
+                                        onChange={(event) =>
+                                            setCancellationReason(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Tulis alasan kenapa order dibatalkan oleh admin."
+                                        className="mt-2 w-full rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                                    />
 
-                                <button
-                                    type="button"
-                                    onClick={() => handleStatusUpdate("Cancelled")}
-                                    disabled={!canCancel}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <Ban className="h-4 w-4" />
-                                    Cancel Order
-                                </button>
+                                    <div className="mt-4 grid gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStatusUpdate("Cancelled")}
+                                            disabled={!canCancel}
+                                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <Ban className="h-4 w-4" />
+                                            Cancel Order
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleStatusUpdate("Delivered")}
+                                            disabled={!canDeliver}
+                                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <BadgeCheck className="h-4 w-4" />
+                                            Mark as Delivered
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </div>

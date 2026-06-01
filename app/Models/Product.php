@@ -11,6 +11,7 @@ class Product extends Model
 {
     use HasFactory;
 
+    public const LOW_STOCK_THRESHOLD = 10;
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_OUT_OF_STOCK = 'out_of_stock';
@@ -48,5 +49,15 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function isOutOfStock(): bool
+    {
+        return $this->stock <= 0;
+    }
+
+    public function isLowStock(): bool
+    {
+        return $this->stock > 0 && $this->stock <= self::LOW_STOCK_THRESHOLD;
     }
 }

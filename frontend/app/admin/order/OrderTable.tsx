@@ -15,7 +15,14 @@ type OrderTableProps = {
     onUpdateOrder: (
         orderId: string,
         updates: Partial<
-            Pick<OrderItemData, "status" | "paymentStatus" | "declineReason">
+            Pick<
+                OrderItemData,
+                | "status"
+                | "paymentStatus"
+                | "declineReason"
+                | "paymentRejectionReason"
+                | "cancellationReason"
+            >
         >,
     ) => void;
 };
@@ -136,6 +143,7 @@ export default function OrderTable({
             </div>
 
             <OrderDetailModal
+                key={`${selectedOrder?.id ?? "empty"}-${selectedOrder?.paymentStatus ?? ""}-${selectedOrder?.status ?? ""}-${selectedOrder?.paymentRejectionReason ?? ""}-${selectedOrder?.cancellationReason ?? ""}`}
                 isOpen={Boolean(selectedOrder)}
                 order={selectedOrder}
                 onClose={() => setSelectedOrderId(null)}

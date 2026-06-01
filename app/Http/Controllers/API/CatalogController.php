@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductSearch;
+use App\Support\StoredImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -279,7 +280,9 @@ class CatalogController extends Controller
         return response()->json([
             'data' => [
                 ...$this->serializeProduct($product, true),
-                'gallery' => array_values(array_filter([$product->image_url])),
+                'gallery' => array_values(array_filter([
+                    StoredImage::toPublicUrl($product->image_url),
+                ])),
                 'relatedProducts' => $relatedProducts
                     ->map(fn (Product $item) => $this->serializeProduct($item))
                     ->values(),

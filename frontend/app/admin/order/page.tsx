@@ -18,11 +18,14 @@ function normalizeOrder(item: OrderData): OrderItemData {
         orderNumber: item.orderNumber,
         customerName: item.customerName,
         orderDate: item.orderDate ?? "-",
+        paymentDeadline: item.paymentDeadline,
         paymentMethod: item.paymentMethod as OrderItemData["paymentMethod"],
         paymentStatus: item.paymentStatus as OrderItemData["paymentStatus"],
         status: item.status as OrderItemData["status"],
         declineReason: item.declineReason,
-        paymentProofImage: item.paymentProofImage,
+        paymentRejectionReason: item.paymentRejectionReason,
+        cancellationReason: item.cancellationReason,
+        paymentProofImage: item.paymentProofImage ?? null,
         customer: item.customer,
         items: item.items.map((orderItem) => ({
             id: orderItem.id,
@@ -64,7 +67,39 @@ export default function OrderPage() {
     };
 
     useEffect(() => {
-        void loadOrders();
+        let mounted = true;
+
+        const bootstrapOrders = async () => {
+            try {
+                const response = await fetchAdminOrders();
+
+                if (!mounted) {
+                    return;
+                }
+
+                setOrders(response.data.map(normalizeOrder));
+                setSummary(response.summary);
+            } catch {
+                if (!mounted) {
+                    return;
+                }
+
+                setOrders([]);
+                setSummary({
+                    paidOrders: 0,
+                    totalOrders: 0,
+                    deliveredOrders: 0,
+                    progressingOrders: 0,
+                    orderValue: 0,
+                });
+            }
+        };
+
+        void bootstrapOrders();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const filteredOrders = useMemo(() => {
@@ -87,24 +122,41 @@ export default function OrderPage() {
     const handleUpdateOrder = async (
         orderId: string,
         updates: Partial<
-            Pick<OrderItemData, "status" | "paymentStatus" | "declineReason">
+            Pick<
+                OrderItemData,
+                | "status"
+                | "paymentStatus"
+                | "declineReason"
+                | "paymentRejectionReason"
+                | "cancellationReason"
+            >
         >,
     ) => {
-        if (!updates.status) {
+        if (!updates.status && !updates.paymentStatus) {
             return;
         }
 
-        const statusKey = {
-            Progressing: "progressing",
-            Delivered: "delivered",
-            Declined: "declined",
-            Cancelled: "cancelled",
-        }[updates.status] as "progressing" | "delivered" | "declined" | "cancelled";
+        const statusKey = updates.status
+            ? {
+                  Pending: "pending",
+                  Processing: "processing",
+                  Delivered: "delivered",
+                  Cancelled: "cancelled",
+              }[updates.status]
+            : undefined;
+        const paymentStatusKey = updates.paymentStatus
+            ? {
+                  Paid: "paid",
+                  Rejected: "rejected",
+              }[updates.paymentStatus]
+            : undefined;
 
         try {
             await updateAdminOrder(orderId, {
                 status: statusKey,
-                decline_reason: updates.declineReason ?? null,
+                payment_status: paymentStatusKey,
+                payment_rejection_reason: updates.paymentRejectionReason ?? null,
+                cancellation_reason: updates.cancellationReason ?? null,
             });
             await loadOrders();
         } catch (error) {
@@ -136,9 +188,10 @@ export default function OrderPage() {
                                 </h1>
                             </div>
                             <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Semua order sekarang dibaca langsung dari database,
-                                termasuk payment proof, status pembayaran, dan
-                                produk yang dipesan.
+                                Semua order sekarang dibaca langsung dari database
+                                dengan ringkasan yang lebih ringan, lalu detail
+                                bukti pembayaran diambil saat admin membuka modal
+                                order.
                             </p>
                         </div>
                     </div>
@@ -175,7 +228,7 @@ export default function OrderPage() {
                                 </div>
                             </div>
                             <p className="mt-3 text-xs text-slate-300">
-                                {summary.progressingOrders} progressing,{" "}
+                                {summary.progressingOrders} pending/processing,{" "}
                                 {summary.deliveredOrders} delivered
                             </p>
                         </div>
@@ -213,7 +266,7 @@ export default function OrderPage() {
 
                         <div className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
                             <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                Progressing
+                                Pending / Processing
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">
                                 {summary.progressingOrders}
@@ -243,9 +296,9 @@ export default function OrderPage() {
                             className="h-12 rounded-lg border border-blue-100 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         >
                             <option value="Semua Status">Semua Status</option>
-                            <option value="Progressing">Progressing</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Processing">Processing</option>
                             <option value="Delivered">Delivered</option>
-                            <option value="Declined">Declined</option>
                             <option value="Cancelled">Cancelled</option>
                         </select>
                     </div>

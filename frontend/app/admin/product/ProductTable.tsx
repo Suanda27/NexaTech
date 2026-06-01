@@ -159,7 +159,13 @@ export default function ProductTable({
                                             <span className="text-sm font-semibold">
                                                 {product.stock}
                                             </span>
-                                            <span className="mt-0.5">unit</span>
+                                            <span className="mt-0.5">
+                                                {product.isOutOfStock
+                                                    ? "habis"
+                                                    : product.isLowStock
+                                                      ? "menipis"
+                                                      : "unit"}
+                                            </span>
                                         </div>
                                     </td>
 

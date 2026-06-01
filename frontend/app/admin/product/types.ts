@@ -30,6 +30,8 @@ export type ProductItem = {
     rating: number;
     description: string;
     stock: number;
+    isLowStock?: boolean;
+    isOutOfStock?: boolean;
     status: ProductStatus;
     imageUrl: string | null;
     specs: ProductSpec[];

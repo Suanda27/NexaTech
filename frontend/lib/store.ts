@@ -32,6 +32,8 @@ export type ApiProduct = {
     rating: number;
     description: string;
     stock: number;
+    isLowStock?: boolean;
+    isOutOfStock?: boolean;
     status: string;
     statusKey: string;
     imageUrl: string | null;
@@ -78,6 +80,8 @@ export type OrderData = {
     orderNumber: string;
     customerName: string;
     orderDate: string | null;
+    paymentDeadline: string | null;
+    paymentExpiresAt: string | null;
     paymentMethod: string;
     paymentMethodKey: string;
     paymentStatus: string;
@@ -85,7 +89,9 @@ export type OrderData = {
     status: string;
     statusKey: string;
     declineReason: string | null;
-    paymentProofImage: string | null;
+    paymentRejectionReason: string | null;
+    cancellationReason: string | null;
+    paymentProofImage?: string | null;
     customer: {
         firstName: string;
         lastName: string;
@@ -306,11 +312,41 @@ export function createOrder(payload: {
     city: string;
     postal_code: string;
     payment_method: "bank_transfer" | "cod";
-    payment_proof?: string | null;
 }) {
     return sendJson<{ message: string; data: OrderData }>("/api/orders", {
         method: "POST",
         body: JSON.stringify(payload),
+    });
+}
+
+export function uploadOrderPaymentProof(
+    orderId: string,
+    payload: {
+        payment_proof: File;
+    },
+): Promise<{ message: string; data: OrderData }> {
+    const formData = new FormData();
+    formData.append("payment_proof", payload.payment_proof);
+
+    return authFetch(`/api/orders/${orderId}/payment-proof`, {
+        method: "POST",
+        body: formData,
+    }).then(async (response) => {
+        const data = (await response.json()) as {
+            message?: string;
+            errors?: Record<string, string[]>;
+            data: OrderData;
+        };
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ??
+                    Object.values(data.errors ?? {})[0]?.[0] ??
+                    "Gagal mengupload bukti pembayaran",
+            );
+        }
+
+        return data as { message: string; data: OrderData };
     });
 }
 
@@ -381,6 +417,8 @@ export function fetchAdminProducts() {
             totalInventoryValue: number;
             totalStock: number;
             activeProducts: number;
+            lowStockProducts: number;
+            outOfStockProducts: number;
         };
     }>("/api/admin/products");
 }
@@ -463,11 +501,17 @@ export function fetchAdminOrders() {
     }>("/api/admin/orders");
 }
 
+export function fetchAdminOrderDetail(orderId: string) {
+    return fetchJson<{ data: OrderData }>(`/api/admin/orders/${orderId}`);
+}
+
 export function updateAdminOrder(
     orderId: string,
     payload: {
-        status: "progressing" | "delivered" | "declined" | "cancelled";
-        decline_reason?: string | null;
+        status?: "pending" | "processing" | "delivered" | "cancelled";
+        payment_status?: "paid" | "rejected";
+        payment_rejection_reason?: string | null;
+        cancellation_reason?: string | null;
     },
 ) {
     return sendJson<{ message: string; data: OrderData }>(

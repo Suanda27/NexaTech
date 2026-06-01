@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Admin;
 use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Support\StoredImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -32,6 +33,12 @@ class AdminProductController extends Controller
                 ),
                 'totalStock' => $products->sum('stock'),
                 'activeProducts' => $products->where('status', Product::STATUS_ACTIVE)->count(),
+                'lowStockProducts' => $products->filter(
+                    fn (Product $product) => $product->isLowStock(),
+                )->count(),
+                'outOfStockProducts' => $products->filter(
+                    fn (Product $product) => $product->isOutOfStock(),
+                )->count(),
             ],
         ]);
     }
@@ -51,7 +58,10 @@ class AdminProductController extends Controller
                 'stock' => $validated['stock'],
                 'status' => $this->normalizeStatus($validated['status'], $validated['stock']),
                 'rating' => $validated['rating'],
-                'image_url' => $validated['image_url'] ?? null,
+                'image_url' => StoredImage::sync(
+                    $validated['image_url'] ?? null,
+                    'catalog/products',
+                ),
             ]);
 
             $this->syncSpecifications($product, $validated['specs'] ?? []);
@@ -80,7 +90,11 @@ class AdminProductController extends Controller
                 'stock' => $validated['stock'],
                 'status' => $this->normalizeStatus($validated['status'], $validated['stock']),
                 'rating' => $validated['rating'],
-                'image_url' => $validated['image_url'] ?? null,
+                'image_url' => StoredImage::sync(
+                    $validated['image_url'] ?? null,
+                    'catalog/products',
+                    $product->image_url,
+                ),
             ]);
 
             $product->specifications()->delete();
