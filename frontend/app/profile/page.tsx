@@ -27,6 +27,11 @@ import {
     type ProfileResponse,
 } from "@/lib/store";
 import OrderAlert from "@/app/components/profile/OrderAlert";
+import {
+    getOrderNotice,
+    getOrderStatusLabel,
+    getPaymentStatusLabel,
+} from "@/lib/order-status";
 
 export default function Page() {
     const { setUser } = useAuth();
@@ -446,13 +451,11 @@ function OrderHistoryCard({
 
     const isTransferOrder = order.paymentMethodKey === "bank_transfer";
     const isWaitingPayment = order.paymentStatusKey === "waiting_payment";
-    const isWaitingVerification =
-        order.paymentStatusKey === "waiting_verification";
-    const isPaid = order.paymentStatusKey === "paid";
     const isRejected = order.paymentStatusKey === "rejected";
     const isExpired = order.paymentStatusKey === "expired";
     const isCancelledByAdmin = order.statusKey === "cancelled" && !isExpired;
     const showRejectedPaymentAlert = isRejected && !isCancelledByAdmin;
+    const orderNotice = getOrderNotice(order);
 
     const canUploadPaymentProof =
         isTransferOrder &&
@@ -539,10 +542,10 @@ function OrderHistoryCard({
                             {order.orderNumber}
                         </span>
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                            {order.paymentStatus}
+                            {getPaymentStatusLabel(order.paymentStatusKey)}
                         </span>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                            {order.status}
+                            {getOrderStatusLabel(order.statusKey)}
                         </span>
                     </div>
                     <p className="text-sm text-slate-500">
@@ -601,61 +604,10 @@ function OrderHistoryCard({
                 ))}
             </div>
 
-            {isWaitingPayment && !isCancelledByAdmin && (
+            {orderNotice && (
                 <div className="mt-4">
-                    <OrderAlert variant="warning">
-                        Order ini menunggu pembayaran. Upload bukti transfer sebelum
-                        deadline agar admin bisa memverifikasi pembayaran Anda.
-                    </OrderAlert>
-                </div>
-            )}
-
-            {isWaitingVerification && (
-                <div className="mt-4">
-                    <OrderAlert variant="success">
-                        Bukti pembayaran berhasil dikirim. Admin sedang memverifikasi
-                        pembayaran Anda.
-                    </OrderAlert>
-                </div>
-            )}
-
-            {isPaid && (
-                <div className="mt-4">
-                    <OrderAlert variant="success">
-                        Pembayaran berhasil dikonfirmasi. Order Anda sedang diproses
-                        oleh admin.
-                    </OrderAlert>
-                </div>
-            )}
-
-            {showRejectedPaymentAlert && (
-                <div className="mt-4">
-                    <OrderAlert variant="danger">
-                        Pembayaran Anda gagal diverifikasi. Silakan upload ulang
-                        bukti transfer sebelum waktu habis.
-                        {order.paymentRejectionReason
-                            ? ` Alasan admin: ${order.paymentRejectionReason}`
-                            : ""}
-                    </OrderAlert>
-                </div>
-            )}
-
-            {isCancelledByAdmin && (
-                <div className="mt-4">
-                    <OrderAlert variant="muted">
-                        Order ditolak oleh admin.
-                        {order.cancellationReason
-                            ? ` Alasan: ${order.cancellationReason}`
-                            : " Silakan hubungi admin untuk informasi lebih lanjut."}
-                    </OrderAlert>
-                </div>
-            )}
-
-            {isExpired && (
-                <div className="mt-4">
-                    <OrderAlert variant="danger">
-                        Waktu pembayaran habis. Order otomatis dibatalkan karena
-                        pembayaran tidak diterima sebelum deadline berakhir.
+                    <OrderAlert variant={orderNotice.variant}>
+                        {orderNotice.message}
                     </OrderAlert>
                 </div>
             )}
@@ -740,7 +692,7 @@ function OrderHistoryCard({
                             Payment
                         </p>
                         <p className="text-xs text-gray-600">
-                            {order.paymentMethod} - {order.paymentStatus}
+                            {order.paymentMethod} - {getPaymentStatusLabel(order.paymentStatusKey)}
                         </p>
                     </div>
                 </div>

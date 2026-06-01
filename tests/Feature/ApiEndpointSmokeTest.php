@@ -242,9 +242,10 @@ class ApiEndpointSmokeTest extends TestCase
             ->assertJsonPath('data.stats.totalProducts', 1);
 
         $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/admin/products')
+            ->getJson('/api/admin/products?per_page=5')
             ->assertOk()
             ->assertJsonPath('summary.totalProducts', 1)
+            ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.id', $product->id);
 
         $this->actingAs($admin, 'sanctum')
@@ -271,6 +272,7 @@ class ApiEndpointSmokeTest extends TestCase
             ->assertJsonPath('data.name', 'NexaKeyboard');
 
         $createdProductId = Product::query()->where('sku', 'SKU-KEY-001')->value('id');
+        $createdProductImagePath = Product::query()->where('sku', 'SKU-KEY-001')->value('image_url');
 
         $this->actingAs($admin, 'sanctum')
             ->putJson("/api/admin/products/{$createdProductId}", [
@@ -296,9 +298,10 @@ class ApiEndpointSmokeTest extends TestCase
             ->assertJsonPath('data.name', 'NexaKeyboard V2');
 
         $this->actingAs($admin, 'sanctum')
-            ->getJson('/api/admin/orders')
+            ->getJson('/api/admin/orders?per_page=5')
             ->assertOk()
             ->assertJsonPath('summary.totalOrders', 1)
+            ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.id', (string) $order->id);
 
         $this->actingAs($admin, 'sanctum')
@@ -310,6 +313,10 @@ class ApiEndpointSmokeTest extends TestCase
             ->deleteJson("/api/admin/products/{$createdProductId}")
             ->assertOk()
             ->assertJsonPath('message', 'Produk berhasil dihapus.');
+
+        if (is_string($createdProductImagePath) && $createdProductImagePath !== '') {
+            Storage::disk('public')->assertMissing($createdProductImagePath);
+        }
     }
 
     private function createCustomerUser(): User

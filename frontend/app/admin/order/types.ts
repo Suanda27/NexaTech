@@ -1,5 +1,7 @@
 "use client";
 
+import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
+
 export type OrderPaymentMethod = "Bank Transfer" | "COD";
 export type OrderPaymentStatus =
     | "Waiting Payment"
@@ -36,8 +38,11 @@ export type OrderItemData = {
     customerName: string;
     orderDate: string;
     paymentDeadline: string | null;
+    paymentMethodKey: string;
     paymentMethod: OrderPaymentMethod;
+    paymentStatusKey: PaymentStatusKey;
     paymentStatus: OrderPaymentStatus;
+    statusKey: OrderStatusKey;
     status: OrderStatus;
     declineReason: string | null;
     paymentRejectionReason: string | null;

@@ -5,10 +5,15 @@ import { Eye } from "lucide-react";
 import OrderDetailModal from "./components/OrderDetailModal";
 import type { OrderItemData } from "./types";
 import {
+    formatPrice,
     getPaymentMethodClasses,
     getPaymentStatusClasses,
     getStatusClasses,
 } from "./utils";
+import {
+    getOrderStatusLabel,
+    getPaymentStatusLabel,
+} from "@/lib/order-status";
 
 type OrderTableProps = {
     orders: OrderItemData[];
@@ -68,6 +73,7 @@ export default function OrderTable({
                                 <th className="px-6 py-4">Metode Pembayaran</th>
                                 <th className="px-6 py-4">Payment Status</th>
                                 <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Total</th>
                                 <th className="px-6 py-4">Aksi</th>
                             </tr>
                         </thead>
@@ -110,7 +116,7 @@ export default function OrderTable({
                                                 order.paymentStatus,
                                             )}`}
                                         >
-                                            {order.paymentStatus}
+                                            {getPaymentStatusLabel(order.paymentStatusKey)}
                                         </span>
                                     </td>
 
@@ -121,8 +127,19 @@ export default function OrderTable({
                                             )}`}
                                         >
                                             <span className="h-2 w-2 rounded-full bg-current" />
-                                            {order.status}
+                                            {getOrderStatusLabel(order.statusKey)}
                                         </span>
+                                    </td>
+
+                                    <td className="px-6 py-4 font-semibold text-slate-950">
+                                        {formatPrice(
+                                            order.items.reduce(
+                                                (sum, item) =>
+                                                    sum +
+                                                    item.unitPrice * item.quantity,
+                                                0,
+                                            ),
+                                        )}
                                     </td>
 
                                     <td className="px-6 py-4">

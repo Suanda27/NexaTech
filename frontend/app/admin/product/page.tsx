@@ -25,6 +25,7 @@ import {
     deleteAdminProduct,
     fetchAdminCategories,
     fetchAdminProducts,
+    type PaginationMeta,
     updateAdminProduct,
 } from "@/lib/store";
 
@@ -82,6 +83,12 @@ function normalizeProduct(item: {
 
 export default function ProductPage() {
     const [products, setProducts] = useState<ProductItem[]>([]);
+    const [meta, setMeta] = useState<PaginationMeta>({
+        currentPage: 1,
+        lastPage: 1,
+        perPage: 10,
+        total: 0,
+    });
     const [categoryLookup, setCategoryLookup] = useState<CategoryLookup[]>([]);
     const [summary, setSummary] = useState({
         totalProducts: 0,
@@ -93,20 +100,36 @@ export default function ProductPage() {
     });
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("Semua Kategori");
+    const [selectedStatus, setSelectedStatus] = useState("Semua Status");
+    const [currentPage, setCurrentPage] = useState(1);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
     const [deletingProduct, setDeletingProduct] =
         useState<ProductItem | null>(null);
 
-    const loadData = async () => {
+    const loadData = async (page = currentPage) => {
         try {
             const [productsResponse, categoriesResponse] = await Promise.all([
-                fetchAdminProducts(),
+                fetchAdminProducts({
+                    q: searchQuery || null,
+                    category:
+                        selectedCategory === "Semua Kategori"
+                            ? null
+                            : selectedCategory,
+                    status:
+                        selectedStatus === "Semua Status"
+                            ? null
+                            : mapUiStatusToApi(selectedStatus as ProductItem["status"]),
+                    page,
+                    perPage: meta.perPage,
+                }),
                 fetchAdminCategories(),
             ]);
 
             setProducts(productsResponse.data.map(normalizeProduct));
             setSummary(productsResponse.summary);
+            setMeta(productsResponse.meta);
+            setCurrentPage(productsResponse.meta.currentPage);
             setCategoryLookup(
                 categoriesResponse.data.map((category) => ({
                     id: category.id,
@@ -124,6 +147,12 @@ export default function ProductPage() {
                 lowStockProducts: 0,
                 outOfStockProducts: 0,
             });
+            setMeta({
+                currentPage: 1,
+                lastPage: 1,
+                perPage: 10,
+                total: 0,
+            });
         }
     };
 
@@ -133,7 +162,19 @@ export default function ProductPage() {
         const bootstrapData = async () => {
             try {
                 const [productsResponse, categoriesResponse] = await Promise.all([
-                    fetchAdminProducts(),
+                    fetchAdminProducts({
+                        q: searchQuery || null,
+                        category:
+                            selectedCategory === "Semua Kategori"
+                                ? null
+                                : selectedCategory,
+                        status:
+                            selectedStatus === "Semua Status"
+                                ? null
+                                : mapUiStatusToApi(selectedStatus as ProductItem["status"]),
+                        page: currentPage,
+                        perPage: meta.perPage,
+                    }),
                     fetchAdminCategories(),
                 ]);
 
@@ -143,6 +184,7 @@ export default function ProductPage() {
 
                 setProducts(productsResponse.data.map(normalizeProduct));
                 setSummary(productsResponse.summary);
+                setMeta(productsResponse.meta);
                 setCategoryLookup(
                     categoriesResponse.data.map((category) => ({
                         id: category.id,
@@ -164,6 +206,12 @@ export default function ProductPage() {
                     lowStockProducts: 0,
                     outOfStockProducts: 0,
                 });
+                setMeta({
+                    currentPage: 1,
+                    lastPage: 1,
+                    perPage: 10,
+                    total: 0,
+                });
             }
         };
 
@@ -172,29 +220,16 @@ export default function ProductPage() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [currentPage, meta.perPage, searchQuery, selectedCategory, selectedStatus]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedCategory, selectedStatus]);
 
     const categories = useMemo(
         () => categoryLookup.map((category) => category.name),
         [categoryLookup],
     );
-
-    const filteredProducts = useMemo(() => {
-        return products.filter((product) => {
-            const matchesSearch =
-                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.description
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase());
-
-            const matchesCategory =
-                selectedCategory === "Semua Kategori" ||
-                product.category === selectedCategory;
-
-            return matchesSearch && matchesCategory;
-        });
-    }, [products, searchQuery, selectedCategory]);
 
     const totalInventoryValue = useMemo(
         () => summary.totalInventoryValue,
@@ -222,6 +257,17 @@ export default function ProductPage() {
         }
     };
 
+    const mapUiStatusToApi = (status: ProductItem["status"]) => {
+        switch (status) {
+            case "Inactive":
+                return "inactive";
+            case "Out of Stock":
+                return "out_of_stock";
+            default:
+                return "active";
+        }
+    };
+
     const handleAddProduct = async (payload: ProductFormValues) => {
         try {
             await createAdminProduct({
@@ -242,7 +288,7 @@ export default function ProductPage() {
                 })),
             });
             setIsAddOpen(false);
-            await loadData();
+            await loadData(currentPage);
         } catch (error) {
             alert(
                 error instanceof Error ? error.message : "Gagal menambahkan produk.",
@@ -274,7 +320,7 @@ export default function ProductPage() {
                 })),
             });
             setEditingProduct(null);
-            await loadData();
+            await loadData(currentPage);
         } catch (error) {
             alert(
                 error instanceof Error ? error.message : "Gagal memperbarui produk.",
@@ -290,7 +336,7 @@ export default function ProductPage() {
         try {
             await deleteAdminProduct(deletingProduct.id);
             setDeletingProduct(null);
-            await loadData();
+            await loadData(currentPage);
         } catch (error) {
             alert(
                 error instanceof Error ? error.message : "Gagal menghapus produk.",
@@ -423,7 +469,7 @@ export default function ProductPage() {
                         </h2>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,280px)_220px]">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,280px)_220px_220px]">
                         <div className="relative">
                             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-400" />
                             <input
@@ -451,16 +497,60 @@ export default function ProductPage() {
                                 </option>
                             ))}
                         </select>
+
+                        <select
+                            value={selectedStatus}
+                            onChange={(event) =>
+                                setSelectedStatus(event.target.value)
+                            }
+                            className="rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                        >
+                            <option value="Semua Status">Semua Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                            <option value="Out of Stock">Out of Stock</option>
+                        </select>
                     </div>
                 </div>
 
                 <div className="mt-6">
                     <ProductTable
-                        products={filteredProducts}
+                        products={products}
                         onAdd={() => setIsAddOpen(true)}
                         onEdit={setEditingProduct}
                         onDelete={setDeletingProduct}
                     />
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 border-t border-blue-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                    <p>
+                        Menampilkan {products.length} produk dari total {meta.total} data.
+                    </p>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                            disabled={meta.currentPage <= 1}
+                            className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Sebelumnya
+                        </button>
+                        <span className="rounded-lg bg-blue-50 px-3 py-2 font-medium text-blue-700">
+                            Halaman {meta.currentPage} / {meta.lastPage}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setCurrentPage((page) =>
+                                    Math.min(page + 1, meta.lastPage),
+                                )
+                            }
+                            disabled={meta.currentPage >= meta.lastPage}
+                            className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Berikutnya
+                        </button>
+                    </div>
                 </div>
             </section>
 

@@ -22,6 +22,10 @@ import {
     getPaymentStatusClasses,
     getStatusClasses,
 } from "../utils";
+import {
+    getOrderStatusLabel,
+    getPaymentStatusLabel,
+} from "@/lib/order-status";
 
 function mapOrderDetail(item: OrderData): OrderItemData {
     return {
@@ -30,8 +34,11 @@ function mapOrderDetail(item: OrderData): OrderItemData {
         customerName: item.customerName,
         orderDate: item.orderDate ?? "-",
         paymentDeadline: item.paymentDeadline,
+        paymentMethodKey: item.paymentMethodKey,
         paymentMethod: item.paymentMethod as OrderItemData["paymentMethod"],
+        paymentStatusKey: item.paymentStatusKey as OrderItemData["paymentStatusKey"],
         paymentStatus: item.paymentStatus as OrderItemData["paymentStatus"],
+        statusKey: item.statusKey as OrderItemData["statusKey"],
         status: item.status as OrderItemData["status"],
         declineReason: item.declineReason,
         paymentRejectionReason: item.paymentRejectionReason,
@@ -160,19 +167,19 @@ export default function OrderDetailModal({
     }
 
     const canApprovePayment =
-        currentOrder.paymentMethod === "Bank Transfer" &&
-        currentOrder.paymentStatus === "Waiting Verification";
+        currentOrder.paymentMethodKey === "bank_transfer" &&
+        currentOrder.paymentStatusKey === "waiting_verification";
     const canRejectPayment =
-        currentOrder.paymentMethod === "Bank Transfer" &&
-        currentOrder.paymentStatus === "Waiting Verification";
+        currentOrder.paymentMethodKey === "bank_transfer" &&
+        currentOrder.paymentStatusKey === "waiting_verification";
     const canCancel =
-        currentOrder.status !== "Delivered" &&
-        currentOrder.status !== "Cancelled" &&
-        currentOrder.paymentStatus !== "Expired";
+        currentOrder.statusKey !== "delivered" &&
+        currentOrder.statusKey !== "cancelled" &&
+        currentOrder.paymentStatusKey !== "expired";
     const canDeliver =
-        currentOrder.status === "Processing" &&
-        (currentOrder.paymentMethod === "COD" ||
-            currentOrder.paymentStatus === "Paid");
+        currentOrder.statusKey === "processing" &&
+        (currentOrder.paymentMethodKey === "cod" ||
+            currentOrder.paymentStatusKey === "paid");
 
     const handleStatusUpdate = (
         status?: OrderStatus,
@@ -245,17 +252,17 @@ export default function OrderDetailModal({
                                     currentOrder.paymentStatus,
                                 )}`}
                             >
-                                {currentOrder.paymentStatus}
+                                {getPaymentStatusLabel(currentOrder.paymentStatusKey)}
                             </span>
                             <span
                                 className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${getStatusClasses(
                                     currentOrder.status,
                                 )}`}
                             >
-                                {currentOrder.status}
+                                {getOrderStatusLabel(currentOrder.statusKey)}
                             </span>
                             </div>
-                            {currentOrder.paymentMethod === "Bank Transfer" &&
+                            {currentOrder.paymentMethodKey === "bank_transfer" &&
                                 currentOrder.paymentDeadline && (
                                     <p className="mt-3 text-sm font-medium text-amber-700">
                                         Deadline pembayaran: {currentOrder.paymentDeadline}
@@ -393,7 +400,7 @@ export default function OrderDetailModal({
                                         Payment Status
                                     </p>
                                     <p className="mt-2 text-sm text-slate-200">
-                                        {currentOrder.paymentStatus}
+                                        {getPaymentStatusLabel(currentOrder.paymentStatusKey)}
                                     </p>
                                 </div>
                                 <div>
@@ -407,7 +414,7 @@ export default function OrderDetailModal({
                             </div>
                         </section>
 
-                        {currentOrder.paymentStatus === "Rejected" &&
+                        {currentOrder.paymentStatusKey === "rejected" &&
                             !currentOrder.cancellationReason && (
                             <section className="rounded-lg border border-red-100 bg-red-50/70 p-5">
                                 <div className="flex items-center gap-2 text-sm font-semibold text-red-700">
@@ -428,7 +435,7 @@ export default function OrderDetailModal({
                                 Bukti Pembayaran
                             </div>
 
-                            {currentOrder.paymentMethod === "Bank Transfer" ? (
+                            {currentOrder.paymentMethodKey === "bank_transfer" ? (
                                 currentOrder.paymentProofImage ? (
                                     <div className="mt-4 overflow-hidden rounded-lg border border-blue-100 bg-blue-50">
                                         <img
@@ -459,9 +466,9 @@ export default function OrderDetailModal({
                                 Order Action
                             </div>
                             <p className="mt-2 text-sm leading-6 text-slate-500">
-                                {currentOrder.status === "Delivered" ||
-                                currentOrder.status === "Cancelled" ||
-                                currentOrder.paymentStatus === "Expired"
+                                {currentOrder.statusKey === "delivered" ||
+                                currentOrder.statusKey === "cancelled" ||
+                                currentOrder.paymentStatusKey === "expired"
                                     ? "Order ini sudah final dan tidak dapat diproses lebih lanjut dari panel admin."
                                     : "Gunakan blok konfirmasi pembayaran untuk approve atau reject transfer, lalu blok cancel jika order memang harus dibatalkan dari sisi admin."}
                             </p>

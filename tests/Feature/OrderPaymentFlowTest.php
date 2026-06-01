@@ -139,6 +139,57 @@ class OrderPaymentFlowTest extends TestCase
             ->assertJsonPath('data.statusKey', Order::STATUS_PROCESSING);
     }
 
+    public function test_admin_reject_requires_reason_and_customer_can_reupload(): void
+    {
+        Storage::fake(Order::PAYMENT_PROOF_DISK);
+
+        $user = $this->createCustomerUser();
+        $admin = $this->createAdminUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $orderId = (string) $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+            ]))
+            ->json('data.id');
+
+        $this->actingAs($user, 'sanctum')
+            ->post("/api/orders/{$orderId}/payment-proof", [
+                'payment_proof' => UploadedFile::fake()->image('payment-proof.png'),
+            ])
+            ->assertOk();
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/admin/orders/{$orderId}", [
+                'payment_status' => Order::PAYMENT_STATUS_REJECTED,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Alasan penolakan wajib diisi.');
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/admin/orders/{$orderId}", [
+                'payment_status' => Order::PAYMENT_STATUS_REJECTED,
+                'payment_rejection_reason' => 'Nominal transfer tidak sesuai.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_REJECTED)
+            ->assertJsonPath('data.paymentRejectionReason', 'Nominal transfer tidak sesuai.');
+
+        $this->actingAs($user, 'sanctum')
+            ->post("/api/orders/{$orderId}/payment-proof", [
+                'payment_proof' => UploadedFile::fake()->image('payment-proof-reupload.png'),
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_WAITING_VERIFICATION)
+            ->assertJsonPath('data.paymentRejectionReason', null);
+    }
+
     public function test_transfer_order_becomes_expired_after_deadline(): void
     {
         $user = $this->createCustomerUser();

@@ -5,19 +5,33 @@ namespace App\Http\Controllers\API\Admin;
 use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\Product;
+use App\Services\Orders\OrderAdminService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AdminOrderController extends Controller
 {
     use SerializesStoreData;
 
-    public function index()
+    public function __construct(
+        protected OrderAdminService $orderAdminService,
+    ) {
+    }
+
+    public function index(Request $request)
     {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:pending,processing,delivered,cancelled'],
+            'payment_status' => ['nullable', 'in:waiting_payment,waiting_verification,paid,rejected,expired,unpaid'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
         Order::expirePendingTransferPayments();
 
-        $orders = Order::query()
+        $summaryQuery = Order::query();
+        $ordersQuery = Order::query()
             ->select([
                 'id',
                 'user_id',
@@ -48,22 +62,58 @@ class AdminOrderController extends Controller
                 'declined_at',
             ])
             ->with('items')
-            ->latest()
-            ->get();
+            ->latest();
+
+        if (!empty($validated['q'])) {
+            $keyword = trim($validated['q']);
+
+            $ordersQuery->where(function ($query) use ($keyword) {
+                $query
+                    ->where('order_number', 'like', "%{$keyword}%")
+                    ->orWhere('first_name', 'like', "%{$keyword}%")
+                    ->orWhere('last_name', 'like', "%{$keyword}%");
+            });
+        }
+
+        if (!empty($validated['status'])) {
+            $ordersQuery->where('status', $validated['status']);
+        }
+
+        if (!empty($validated['payment_status'])) {
+            $ordersQuery->where('payment_status', $validated['payment_status']);
+        }
+
+        $orders = $ordersQuery->paginate($validated['per_page'] ?? 10);
+        $summary = $summaryQuery
+            ->selectRaw('COUNT(*) as total_orders')
+            ->selectRaw(
+                "SUM(CASE WHEN payment_status = '".Order::PAYMENT_STATUS_PAID."' THEN 1 ELSE 0 END) as paid_orders"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN status = '".Order::STATUS_DELIVERED."' THEN 1 ELSE 0 END) as delivered_orders"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN status IN ('".Order::STATUS_PENDING."', '".Order::STATUS_PROCESSING."') THEN 1 ELSE 0 END) as progressing_orders"
+            )
+            ->selectRaw('COALESCE(SUM(total), 0) as order_value')
+            ->first();
 
         return response()->json([
-            'data' => $orders
+            'data' => $orders->getCollection()
                 ->map(fn (Order $order) => $this->serializeOrder($order, false))
                 ->values(),
             'summary' => [
-                'paidOrders' => $orders->where('payment_status', Order::PAYMENT_STATUS_PAID)->count(),
-                'totalOrders' => $orders->count(),
-                'deliveredOrders' => $orders->where('status', Order::STATUS_DELIVERED)->count(),
-                'progressingOrders' => $orders->whereIn('status', [
-                    Order::STATUS_PENDING,
-                    Order::STATUS_PROCESSING,
-                ])->count(),
-                'orderValue' => $orders->sum('total'),
+                'paidOrders' => (int) ($summary->paid_orders ?? 0),
+                'totalOrders' => (int) ($summary->total_orders ?? 0),
+                'deliveredOrders' => (int) ($summary->delivered_orders ?? 0),
+                'progressingOrders' => (int) ($summary->progressing_orders ?? 0),
+                'orderValue' => (int) ($summary->order_value ?? 0),
+            ],
+            'meta' => [
+                'currentPage' => $orders->currentPage(),
+                'lastPage' => $orders->lastPage(),
+                'perPage' => $orders->perPage(),
+                'total' => $orders->total(),
             ],
         ]);
     }
@@ -89,112 +139,18 @@ class AdminOrderController extends Controller
         Order::expirePendingTransferPayments();
         $order->refresh();
 
-        if ($order->status === Order::STATUS_DELIVERED || $order->payment_status === Order::PAYMENT_STATUS_EXPIRED) {
+        try {
+            $updatedOrder = $this->orderAdminService->update($order, $validated);
+        } catch (ValidationException $exception) {
             return response()->json([
-                'message' => 'Order ini sudah tidak bisa diubah lagi.',
+                'message' => collect($exception->errors())->flatten()->first() ?? 'Status order gagal diperbarui.',
+                'errors' => $exception->errors(),
             ], 422);
-        }
-
-        if (($validated['status'] ?? null) === null && ($validated['payment_status'] ?? null) === null) {
-            return response()->json([
-                'message' => 'Tidak ada perubahan status yang dikirim.',
-            ], 422);
-        }
-
-        if (($validated['payment_status'] ?? null) === Order::PAYMENT_STATUS_PAID) {
-            if (
-                $order->payment_method !== Order::PAYMENT_METHOD_BANK_TRANSFER
-                || $order->payment_status !== Order::PAYMENT_STATUS_WAITING_VERIFICATION
-            ) {
-                return response()->json([
-                    'message' => 'Order ini belum siap disetujui pembayarannya.',
-                ], 422);
-            }
-
-            $order->payment_status = Order::PAYMENT_STATUS_PAID;
-            $order->status = Order::STATUS_PROCESSING;
-            $order->payment_verified_at = now();
-            $order->payment_rejection_reason = null;
-            $order->decline_reason = null;
-        } elseif (($validated['payment_status'] ?? null) === Order::PAYMENT_STATUS_REJECTED) {
-            if (
-                $order->payment_method !== Order::PAYMENT_METHOD_BANK_TRANSFER
-                || $order->payment_status !== Order::PAYMENT_STATUS_WAITING_VERIFICATION
-            ) {
-                return response()->json([
-                    'message' => 'Order ini belum bisa ditolak pembayarannya.',
-                ], 422);
-            }
-
-            if (empty($validated['payment_rejection_reason'])) {
-                return response()->json([
-                    'message' => 'Alasan penolakan wajib diisi.',
-                ], 422);
-            }
-
-            $order->payment_status = Order::PAYMENT_STATUS_REJECTED;
-            $order->status = Order::STATUS_PENDING;
-            $order->payment_rejection_reason = $validated['payment_rejection_reason'];
-            $order->decline_reason = $validated['payment_rejection_reason'];
-            $order->payment_verified_at = null;
-            $order->declined_at = now();
-        } elseif (($validated['status'] ?? null) === Order::STATUS_DELIVERED) {
-            if (
-                $order->payment_method === Order::PAYMENT_METHOD_BANK_TRANSFER
-                && $order->payment_status !== Order::PAYMENT_STATUS_PAID
-            ) {
-                return response()->json([
-                    'message' => 'Order transfer hanya bisa dikirim setelah pembayaran disetujui.',
-                ], 422);
-            }
-
-            if ($order->status !== Order::STATUS_PROCESSING) {
-                return response()->json([
-                    'message' => 'Order ini belum masuk tahap processing.',
-                ], 422);
-            }
-
-            $order->status = Order::STATUS_DELIVERED;
-            $order->delivered_at = now();
-
-            if ($order->payment_method === Order::PAYMENT_METHOD_COD) {
-                $order->payment_status = Order::PAYMENT_STATUS_PAID;
-                $order->payment_verified_at = now();
-            }
-        } elseif (($validated['status'] ?? null) === Order::STATUS_CANCELLED) {
-            DB::transaction(function () use ($order, $validated): void {
-                $order->refresh()->loadMissing('items');
-
-                $productIds = $order->items
-                    ->pluck('product_id')
-                    ->filter()
-                    ->unique()
-                    ->values();
-
-                $lockedProducts = Product::query()
-                    ->whereIn('id', $productIds)
-                    ->lockForUpdate()
-                    ->get()
-                    ->keyBy('id');
-
-                $order->releaseReservedStock($lockedProducts);
-                $order->status = Order::STATUS_CANCELLED;
-                $order->cancelled_at = now();
-                $order->cancellation_reason = $validated['cancellation_reason'] ?? $order->cancellation_reason;
-                $order->decline_reason = $validated['cancellation_reason'] ?? $order->decline_reason;
-                $order->save();
-            });
-
-            $order->refresh();
-        }
-
-        if (($validated['status'] ?? null) !== Order::STATUS_CANCELLED) {
-            $order->save();
         }
 
         return response()->json([
             'message' => 'Status order berhasil diperbarui.',
-            'data' => $this->serializeOrder($order->fresh()->load('items')),
+            'data' => $this->serializeOrder($updatedOrder),
         ]);
     }
 }

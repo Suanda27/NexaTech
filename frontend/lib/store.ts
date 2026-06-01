@@ -1,6 +1,7 @@
 "use client";
 
 import { authFetch, fetchJson } from "@/lib/auth";
+import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
 
 export type ApiCategory = {
     id: number;
@@ -45,12 +46,14 @@ export type ApiProduct = {
 
 export type PaginatedProductsResponse = {
     data: ApiProduct[];
-    meta: {
-        currentPage: number;
-        lastPage: number;
-        perPage: number;
-        total: number;
-    };
+    meta: PaginationMeta;
+};
+
+export type PaginationMeta = {
+    currentPage: number;
+    lastPage: number;
+    perPage: number;
+    total: number;
 };
 
 export type CartItem = {
@@ -83,11 +86,11 @@ export type OrderData = {
     paymentDeadline: string | null;
     paymentExpiresAt: string | null;
     paymentMethod: string;
-    paymentMethodKey: string;
+    paymentMethodKey: "bank_transfer" | "cod";
     paymentStatus: string;
-    paymentStatusKey: string;
+    paymentStatusKey: PaymentStatusKey;
     status: string;
-    statusKey: string;
+    statusKey: OrderStatusKey;
     declineReason: string | null;
     paymentRejectionReason: string | null;
     cancellationReason: string | null;
@@ -409,20 +412,6 @@ export async function deleteAdminCategory(categoryId: number) {
     return data;
 }
 
-export function fetchAdminProducts() {
-    return fetchJson<{
-        data: ApiProduct[];
-        summary: {
-            totalProducts: number;
-            totalInventoryValue: number;
-            totalStock: number;
-            activeProducts: number;
-            lowStockProducts: number;
-            outOfStockProducts: number;
-        };
-    }>("/api/admin/products");
-}
-
 export function createAdminProduct(payload: {
     category_id?: number | null;
     sku: string;
@@ -488,7 +477,42 @@ export async function deleteAdminProduct(productId: number) {
     return data;
 }
 
-export function fetchAdminOrders() {
+export function fetchAdminProducts(params?: {
+    q?: string | null;
+    category?: string | null;
+    status?: string | null;
+    page?: number;
+    perPage?: number;
+}) {
+    return fetchJson<{
+        data: ApiProduct[];
+        summary: {
+            totalProducts: number;
+            totalInventoryValue: number;
+            totalStock: number;
+            activeProducts: number;
+            lowStockProducts: number;
+            outOfStockProducts: number;
+        };
+        meta: PaginationMeta;
+    }>(
+        `/api/admin/products${queryString({
+            q: params?.q,
+            category: params?.category,
+            status: params?.status,
+            page: params?.page,
+            per_page: params?.perPage,
+        })}`,
+    );
+}
+
+export function fetchAdminOrders(params?: {
+    q?: string | null;
+    status?: string | null;
+    paymentStatus?: string | null;
+    page?: number;
+    perPage?: number;
+}) {
     return fetchJson<{
         data: OrderData[];
         summary: {
@@ -498,7 +522,16 @@ export function fetchAdminOrders() {
             progressingOrders: number;
             orderValue: number;
         };
-    }>("/api/admin/orders");
+        meta: PaginationMeta;
+    }>(
+        `/api/admin/orders${queryString({
+            q: params?.q,
+            status: params?.status,
+            payment_status: params?.paymentStatus,
+            page: params?.page,
+            per_page: params?.perPage,
+        })}`,
+    );
 }
 
 export function fetchAdminOrderDetail(orderId: string) {

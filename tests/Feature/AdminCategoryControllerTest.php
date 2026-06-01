@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminCategoryControllerTest extends TestCase
@@ -134,6 +135,8 @@ class AdminCategoryControllerTest extends TestCase
 
     public function test_deleting_category_sets_related_products_to_uncategorized(): void
     {
+        Storage::fake('public');
+
         $admin = User::factory()->create([
             'role' => User::ROLE_ADMIN,
         ]);
@@ -141,8 +144,11 @@ class AdminCategoryControllerTest extends TestCase
         $category = Category::query()->create([
             'nama_kategori' => 'Tablet',
             'slug' => 'tablet',
+            'image_url' => 'catalog/categories/tablet.png',
             'is_active' => true,
         ]);
+
+        Storage::disk('public')->put('catalog/categories/tablet.png', 'tablet-image');
 
         $product = Product::query()->create([
             'category_id' => $category->category_id,
@@ -172,5 +178,7 @@ class AdminCategoryControllerTest extends TestCase
             'id' => $product->id,
             'category_id' => null,
         ]);
+
+        Storage::disk('public')->assertMissing('catalog/categories/tablet.png');
     }
 }

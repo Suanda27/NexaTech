@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     BadgeCheck,
     CreditCard,
@@ -10,7 +10,12 @@ import {
 } from "lucide-react";
 import OrderTable from "./OrderTable";
 import type { OrderItemData } from "./types";
-import { fetchAdminOrders, updateAdminOrder, type OrderData } from "@/lib/store";
+import {
+    fetchAdminOrders,
+    updateAdminOrder,
+    type OrderData,
+    type PaginationMeta,
+} from "@/lib/store";
 
 function normalizeOrder(item: OrderData): OrderItemData {
     return {
@@ -19,8 +24,11 @@ function normalizeOrder(item: OrderData): OrderItemData {
         customerName: item.customerName,
         orderDate: item.orderDate ?? "-",
         paymentDeadline: item.paymentDeadline,
+        paymentMethodKey: item.paymentMethodKey,
         paymentMethod: item.paymentMethod as OrderItemData["paymentMethod"],
+        paymentStatusKey: item.paymentStatusKey as OrderItemData["paymentStatusKey"],
         paymentStatus: item.paymentStatus as OrderItemData["paymentStatus"],
+        statusKey: item.statusKey as OrderItemData["statusKey"],
         status: item.status as OrderItemData["status"],
         declineReason: item.declineReason,
         paymentRejectionReason: item.paymentRejectionReason,
@@ -39,6 +47,12 @@ function normalizeOrder(item: OrderData): OrderItemData {
 
 export default function OrderPage() {
     const [orders, setOrders] = useState<OrderItemData[]>([]);
+    const [meta, setMeta] = useState<PaginationMeta>({
+        currentPage: 1,
+        lastPage: 1,
+        perPage: 10,
+        total: 0,
+    });
     const [summary, setSummary] = useState({
         paidOrders: 0,
         totalOrders: 0,
@@ -48,12 +62,22 @@ export default function OrderPage() {
     });
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStatus, setSelectedStatus] = useState("Semua Status");
+    const [currentPage, setCurrentPage] = useState(1);
 
-    const loadOrders = async () => {
+    const loadOrders = async (page = currentPage) => {
         try {
-            const response = await fetchAdminOrders();
+            const response = await fetchAdminOrders({
+                q: searchQuery || null,
+                status: selectedStatus === "Semua Status"
+                    ? null
+                    : selectedStatus.toLowerCase(),
+                page,
+                perPage: meta.perPage,
+            });
             setOrders(response.data.map(normalizeOrder));
             setSummary(response.summary);
+            setMeta(response.meta);
+            setCurrentPage(response.meta.currentPage);
         } catch {
             setOrders([]);
             setSummary({
@@ -63,6 +87,12 @@ export default function OrderPage() {
                 progressingOrders: 0,
                 orderValue: 0,
             });
+            setMeta({
+                currentPage: 1,
+                lastPage: 1,
+                perPage: 10,
+                total: 0,
+            });
         }
     };
 
@@ -71,7 +101,14 @@ export default function OrderPage() {
 
         const bootstrapOrders = async () => {
             try {
-                const response = await fetchAdminOrders();
+                const response = await fetchAdminOrders({
+                    q: searchQuery || null,
+                    status: selectedStatus === "Semua Status"
+                        ? null
+                        : selectedStatus.toLowerCase(),
+                    page: currentPage,
+                    perPage: meta.perPage,
+                });
 
                 if (!mounted) {
                     return;
@@ -79,6 +116,7 @@ export default function OrderPage() {
 
                 setOrders(response.data.map(normalizeOrder));
                 setSummary(response.summary);
+                setMeta(response.meta);
             } catch {
                 if (!mounted) {
                     return;
@@ -92,6 +130,12 @@ export default function OrderPage() {
                     progressingOrders: 0,
                     orderValue: 0,
                 });
+                setMeta({
+                    currentPage: 1,
+                    lastPage: 1,
+                    perPage: 10,
+                    total: 0,
+                });
             }
         };
 
@@ -100,24 +144,11 @@ export default function OrderPage() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [currentPage, meta.perPage, searchQuery, selectedStatus]);
 
-    const filteredOrders = useMemo(() => {
-        return orders.filter((order) => {
-            const matchesSearch =
-                order.orderNumber
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()) ||
-                order.customerName
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase());
-
-            const matchesStatus =
-                selectedStatus === "Semua Status" || order.status === selectedStatus;
-
-            return matchesSearch && matchesStatus;
-        });
-    }, [orders, searchQuery, selectedStatus]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedStatus]);
 
     const handleUpdateOrder = async (
         orderId: string,
@@ -158,7 +189,7 @@ export default function OrderPage() {
                 payment_rejection_reason: updates.paymentRejectionReason ?? null,
                 cancellation_reason: updates.cancellationReason ?? null,
             });
-            await loadOrders();
+            await loadOrders(currentPage);
         } catch (error) {
             alert(
                 error instanceof Error
@@ -305,9 +336,40 @@ export default function OrderPage() {
                 </div>
 
                 <OrderTable
-                    orders={filteredOrders}
+                    orders={orders}
                     onUpdateOrder={handleUpdateOrder}
                 />
+
+                <div className="mt-4 flex flex-col gap-3 border-t border-blue-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                    <p>
+                        Menampilkan {orders.length} order dari total {meta.total} data.
+                    </p>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                            disabled={meta.currentPage <= 1}
+                            className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Sebelumnya
+                        </button>
+                        <span className="rounded-lg bg-blue-50 px-3 py-2 font-medium text-blue-700">
+                            Halaman {meta.currentPage} / {meta.lastPage}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setCurrentPage((page) =>
+                                    Math.min(page + 1, meta.lastPage),
+                                )
+                            }
+                            disabled={meta.currentPage >= meta.lastPage}
+                            className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Berikutnya
+                        </button>
+                    </div>
+                </div>
             </section>
         </div>
     );

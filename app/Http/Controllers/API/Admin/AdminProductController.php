@@ -15,30 +15,80 @@ class AdminProductController extends Controller
 {
     use SerializesStoreData;
 
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::query()
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'in:active,inactive,out_of_stock'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $summaryQuery = Product::query();
+        $productsQuery = Product::query()
             ->with(['category', 'specifications'])
-            ->latest()
-            ->get();
+            ->latest();
+
+        if (!empty($validated['q'])) {
+            $keyword = trim($validated['q']);
+
+            $productsQuery->where(function ($query) use ($keyword) {
+                $query
+                    ->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('sku', 'like', "%{$keyword}%")
+                    ->orWhere('description', 'like', "%{$keyword}%");
+            });
+        }
+
+        if (!empty($validated['category'])) {
+            $categoryFilter = $validated['category'];
+
+            $productsQuery->whereHas('category', function ($query) use ($categoryFilter) {
+                $query
+                    ->where('nama_kategori', $categoryFilter)
+                    ->orWhere('slug', $categoryFilter)
+                    ->orWhere('category_id', $categoryFilter);
+            });
+        }
+
+        if (!empty($validated['status'])) {
+            $productsQuery->where('status', $validated['status']);
+        }
+
+        $products = $productsQuery->paginate($validated['per_page'] ?? 10);
+        $summary = $summaryQuery
+            ->selectRaw('COUNT(*) as total_products')
+            ->selectRaw('COALESCE(SUM(price * stock), 0) as total_inventory_value')
+            ->selectRaw('COALESCE(SUM(stock), 0) as total_stock')
+            ->selectRaw(
+                "SUM(CASE WHEN status = '".Product::STATUS_ACTIVE."' THEN 1 ELSE 0 END) as active_products"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN stock > 0 AND stock <= ".Product::LOW_STOCK_THRESHOLD." THEN 1 ELSE 0 END) as low_stock_products"
+            )
+            ->selectRaw(
+                'SUM(CASE WHEN stock <= 0 THEN 1 ELSE 0 END) as out_of_stock_products'
+            )
+            ->first();
 
         return response()->json([
-            'data' => $products
+            'data' => $products->getCollection()
                 ->map(fn (Product $product) => $this->serializeProduct($product, true))
                 ->values(),
             'summary' => [
-                'totalProducts' => $products->count(),
-                'totalInventoryValue' => $products->sum(
-                    fn (Product $product) => $product->price * $product->stock,
-                ),
-                'totalStock' => $products->sum('stock'),
-                'activeProducts' => $products->where('status', Product::STATUS_ACTIVE)->count(),
-                'lowStockProducts' => $products->filter(
-                    fn (Product $product) => $product->isLowStock(),
-                )->count(),
-                'outOfStockProducts' => $products->filter(
-                    fn (Product $product) => $product->isOutOfStock(),
-                )->count(),
+                'totalProducts' => (int) ($summary->total_products ?? 0),
+                'totalInventoryValue' => (int) ($summary->total_inventory_value ?? 0),
+                'totalStock' => (int) ($summary->total_stock ?? 0),
+                'activeProducts' => (int) ($summary->active_products ?? 0),
+                'lowStockProducts' => (int) ($summary->low_stock_products ?? 0),
+                'outOfStockProducts' => (int) ($summary->out_of_stock_products ?? 0),
+            ],
+            'meta' => [
+                'currentPage' => $products->currentPage(),
+                'lastPage' => $products->lastPage(),
+                'perPage' => $products->perPage(),
+                'total' => $products->total(),
             ],
         ]);
     }
@@ -46,6 +96,7 @@ class AdminProductController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateProduct($request);
+        StoredImage::validateInput($validated['image_url'] ?? null, 'image_url');
 
         $product = DB::transaction(function () use ($validated) {
             $product = Product::query()->create([
@@ -78,6 +129,7 @@ class AdminProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $validated = $this->validateProduct($request, $product);
+        StoredImage::validateInput($validated['image_url'] ?? null, 'image_url');
 
         DB::transaction(function () use ($product, $validated) {
             $product->update([
@@ -109,6 +161,7 @@ class AdminProductController extends Controller
 
     public function destroy(Product $product)
     {
+        StoredImage::delete($product->image_url);
         $product->delete();
 
         return response()->json([

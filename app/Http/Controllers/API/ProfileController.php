@@ -15,9 +15,22 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
-        $orders = Order::query()
+        $summary = Order::query()
             ->where('user_id', $user->id)
-            ->get();
+            ->selectRaw('COUNT(*) as total_orders')
+            ->selectRaw(
+                "SUM(CASE WHEN status IN ('".Order::STATUS_PENDING."', '".Order::STATUS_PROCESSING."') THEN 1 ELSE 0 END) as progressing_orders"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN status = '".Order::STATUS_DELIVERED."' THEN 1 ELSE 0 END) as delivered_orders"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN payment_status = '".Order::PAYMENT_STATUS_REJECTED."' THEN 1 ELSE 0 END) as declined_orders"
+            )
+            ->selectRaw(
+                "SUM(CASE WHEN status = '".Order::STATUS_CANCELLED."' THEN 1 ELSE 0 END) as cancelled_orders"
+            )
+            ->first();
 
         return response()->json([
             'data' => [
@@ -30,14 +43,11 @@ class ProfileController extends Controller
                     'role' => $user->role,
                 ],
                 'summary' => [
-                    'totalOrders' => $orders->count(),
-                    'progressingOrders' => $orders->whereIn('status', [
-                        Order::STATUS_PENDING,
-                        Order::STATUS_PROCESSING,
-                    ])->count(),
-                    'deliveredOrders' => $orders->where('status', Order::STATUS_DELIVERED)->count(),
-                    'declinedOrders' => $orders->where('payment_status', Order::PAYMENT_STATUS_REJECTED)->count(),
-                    'cancelledOrders' => $orders->where('status', Order::STATUS_CANCELLED)->count(),
+                    'totalOrders' => (int) ($summary->total_orders ?? 0),
+                    'progressingOrders' => (int) ($summary->progressing_orders ?? 0),
+                    'deliveredOrders' => (int) ($summary->delivered_orders ?? 0),
+                    'declinedOrders' => (int) ($summary->declined_orders ?? 0),
+                    'cancelledOrders' => (int) ($summary->cancelled_orders ?? 0),
                 ],
             ],
         ]);

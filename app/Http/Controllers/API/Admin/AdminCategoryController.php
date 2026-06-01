@@ -48,6 +48,7 @@ class AdminCategoryController extends Controller
             'image_url' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
         ]);
+        StoredImage::validateInput($validated['image_url'] ?? null, 'image_url');
 
         $category = Category::query()->create([
             'nama_kategori' => $validated['name'],
@@ -81,6 +82,7 @@ class AdminCategoryController extends Controller
             'image_url' => ['nullable', 'string'],
             'status' => ['required', 'in:active,inactive'],
         ]);
+        StoredImage::validateInput($validated['image_url'] ?? null, 'image_url');
 
         $category->update([
             'nama_kategori' => $validated['name'],
@@ -104,6 +106,7 @@ class AdminCategoryController extends Controller
 
     public function destroy(Category $category)
     {
+        StoredImage::delete($category->image_url);
         $category->delete();
 
         return response()->json([
