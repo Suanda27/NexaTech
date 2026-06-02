@@ -16,6 +16,7 @@ import {
     User,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import { useShop } from "@/context/ShopContext";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
@@ -28,11 +29,13 @@ import {
     fetchProfile,
     type CartResponse,
 } from "@/lib/store";
+import { queueFlashToast } from "@/lib/toast";
 
 export default function CheckoutPage() {
     const router = useRouter();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
+    const { notify } = useToast();
     const [payment, setPayment] = useState<"bank_transfer" | "cod">(
         "bank_transfer",
     );
@@ -122,13 +125,27 @@ export default function CheckoutPage() {
             const deadlineMessage =
                 response.data.paymentMethodKey === "bank_transfer" &&
                 response.data.paymentDeadline
-                    ? ` Upload bukti pembayaran sebelum ${response.data.paymentDeadline} dari halaman order Anda.`
+                    ? `Upload bukti transfer sebelum ${response.data.paymentDeadline} dari halaman order Anda.`
                     : "";
 
-            alert(`Order berhasil dibuat.${deadlineMessage}`);
+            queueFlashToast({
+                tone: "success",
+                title: "Checkout berhasil",
+                message: deadlineMessage
+                    ? `Pesanan berhasil dibuat. ${deadlineMessage}`
+                    : "Pesanan berhasil dibuat dan siap diproses.",
+                durationMs: 5200,
+            });
             router.push("/profile?tab=orders");
         } catch (error) {
-            alert(error instanceof Error ? error.message : "Gagal membuat order.");
+            notify({
+                tone: "error",
+                title: "Checkout gagal",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal membuat order.",
+            });
         } finally {
             setIsSubmitting(false);
         }

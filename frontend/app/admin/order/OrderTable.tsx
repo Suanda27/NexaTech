@@ -29,7 +29,7 @@ type OrderTableProps = {
                 | "cancellationReason"
             >
         >,
-    ) => void;
+    ) => Promise<void>;
 };
 
 export default function OrderTable({

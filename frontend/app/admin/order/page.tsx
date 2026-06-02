@@ -8,6 +8,7 @@ import {
     Search,
     Sparkles,
 } from "lucide-react";
+import { useToast } from "@/context/ToastContext";
 import OrderTable from "./OrderTable";
 import type { OrderItemData } from "./types";
 import {
@@ -16,6 +17,7 @@ import {
     type OrderData,
     type PaginationMeta,
 } from "@/lib/store";
+import { syncAdminVerificationNotifications } from "@/lib/order-notification";
 
 function normalizeOrder(item: OrderData): OrderItemData {
     return {
@@ -46,6 +48,7 @@ function normalizeOrder(item: OrderData): OrderItemData {
 }
 
 export default function OrderPage() {
+    const { notify } = useToast();
     const [orders, setOrders] = useState<OrderItemData[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>({
         currentPage: 1,
@@ -78,6 +81,19 @@ export default function OrderPage() {
             setSummary(response.summary);
             setMeta(response.meta);
             setCurrentPage(response.meta.currentPage);
+            if (
+                page === 1 &&
+                !searchQuery &&
+                selectedStatus === "Semua Status"
+            ) {
+                const verificationToast = syncAdminVerificationNotifications(
+                    response.data,
+                );
+
+                if (verificationToast) {
+                    notify(verificationToast);
+                }
+            }
         } catch {
             setOrders([]);
             setSummary({
@@ -117,6 +133,19 @@ export default function OrderPage() {
                 setOrders(response.data.map(normalizeOrder));
                 setSummary(response.summary);
                 setMeta(response.meta);
+                if (
+                    currentPage === 1 &&
+                    !searchQuery &&
+                    selectedStatus === "Semua Status"
+                ) {
+                    const verificationToast = syncAdminVerificationNotifications(
+                        response.data,
+                    );
+
+                    if (verificationToast) {
+                        notify(verificationToast);
+                    }
+                }
             } catch {
                 if (!mounted) {
                     return;
@@ -144,7 +173,7 @@ export default function OrderPage() {
         return () => {
             mounted = false;
         };
-    }, [currentPage, meta.perPage, searchQuery, selectedStatus]);
+    }, [currentPage, meta.perPage, notify, searchQuery, selectedStatus]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -162,7 +191,7 @@ export default function OrderPage() {
                 | "cancellationReason"
             >
         >,
-    ) => {
+    ): Promise<void> => {
         if (!updates.status && !updates.paymentStatus) {
             return;
         }
@@ -183,19 +212,27 @@ export default function OrderPage() {
             : undefined;
 
         try {
-            await updateAdminOrder(orderId, {
+            const response = await updateAdminOrder(orderId, {
                 status: statusKey,
                 payment_status: paymentStatusKey,
                 payment_rejection_reason: updates.paymentRejectionReason ?? null,
                 cancellation_reason: updates.cancellationReason ?? null,
             });
             await loadOrders(currentPage);
+            notify({
+                tone: "success",
+                title: "Order berhasil diperbarui",
+                message: response.message,
+            });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal memperbarui order.",
-            );
+            notify({
+                tone: "error",
+                title: "Gagal memperbarui order",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal memperbarui order.",
+            });
         }
     };
 

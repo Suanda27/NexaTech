@@ -71,7 +71,7 @@ type OrderDetailModalProps = {
                 | "cancellationReason"
             >
         >,
-    ) => void;
+    ) => Promise<void>;
 };
 
 export default function OrderDetailModal({
@@ -88,6 +88,7 @@ export default function OrderDetailModal({
     const [cancellationReason, setCancellationReason] = useState(
         order?.cancellationReason ?? "",
     );
+    const [isActionLoading, setIsActionLoading] = useState(false);
 
     useEffect(() => {
         setDetailOrder(order);
@@ -181,41 +182,47 @@ export default function OrderDetailModal({
         (currentOrder.paymentMethodKey === "cod" ||
             currentOrder.paymentStatusKey === "paid");
 
-    const handleStatusUpdate = (
+    const handleStatusUpdate = async (
         status?: OrderStatus,
         paymentStatus?: OrderPaymentStatus,
     ) => {
-        if (paymentStatus === "Rejected") {
-            const reason =
-                paymentRejectionReason.trim() ||
-                "Payment could not be verified.";
+        setIsActionLoading(true);
 
-            onUpdateOrder(currentOrder.id, {
-                paymentStatus,
-                paymentRejectionReason: reason,
-            });
-            return;
-        }
+        try {
+            if (paymentStatus === "Rejected") {
+                const reason =
+                    paymentRejectionReason.trim() ||
+                    "Payment could not be verified.";
 
-        if (paymentStatus === "Paid") {
-            onUpdateOrder(currentOrder.id, {
-                paymentStatus,
-            });
-            return;
-        }
+                await onUpdateOrder(currentOrder.id, {
+                    paymentStatus,
+                    paymentRejectionReason: reason,
+                });
+                return;
+            }
 
-        if (status === "Cancelled") {
-            onUpdateOrder(currentOrder.id, {
-                status,
-                cancellationReason: cancellationReason.trim() || null,
-            });
-            return;
-        }
+            if (paymentStatus === "Paid") {
+                await onUpdateOrder(currentOrder.id, {
+                    paymentStatus,
+                });
+                return;
+            }
 
-        if (status === "Delivered") {
-            onUpdateOrder(currentOrder.id, {
-                status,
-            });
+            if (status === "Cancelled") {
+                await onUpdateOrder(currentOrder.id, {
+                    status,
+                    cancellationReason: cancellationReason.trim() || null,
+                });
+                return;
+            }
+
+            if (status === "Delivered") {
+                await onUpdateOrder(currentOrder.id, {
+                    status,
+                });
+            }
+        } finally {
+            setIsActionLoading(false);
         }
     };
 
@@ -501,21 +508,21 @@ export default function OrderDetailModal({
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleStatusUpdate(undefined, "Paid")
+                                                void handleStatusUpdate(undefined, "Paid")
                                             }
-                                            disabled={!canApprovePayment}
+                                            disabled={!canApprovePayment || isActionLoading}
                                             className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <BadgeCheck className="h-4 w-4" />
-                                            Approve Payment
+                                            {isActionLoading ? "Memproses..." : "Approve Payment"}
                                         </button>
 
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                handleStatusUpdate(undefined, "Rejected")
+                                                void handleStatusUpdate(undefined, "Rejected")
                                             }
-                                            disabled={!canRejectPayment}
+                                            disabled={!canRejectPayment || isActionLoading}
                                             className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <ShieldAlert className="h-4 w-4" />
@@ -550,8 +557,8 @@ export default function OrderDetailModal({
                                     <div className="mt-4 grid gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => handleStatusUpdate("Cancelled")}
-                                            disabled={!canCancel}
+                                            onClick={() => void handleStatusUpdate("Cancelled")}
+                                            disabled={!canCancel || isActionLoading}
                                             className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <Ban className="h-4 w-4" />
@@ -560,8 +567,8 @@ export default function OrderDetailModal({
 
                                         <button
                                             type="button"
-                                            onClick={() => handleStatusUpdate("Delivered")}
-                                            disabled={!canDeliver}
+                                            onClick={() => void handleStatusUpdate("Delivered")}
+                                            disabled={!canDeliver || isActionLoading}
                                             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <BadgeCheck className="h-4 w-4" />

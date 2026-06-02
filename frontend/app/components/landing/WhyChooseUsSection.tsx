@@ -1,5 +1,8 @@
+"use client";
+
 import { Zap, Shield, Award, Truck } from "lucide-react";
 import { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 type Feature = {
     icon: LucideIcon;
@@ -52,12 +55,21 @@ export default function WhyChooseUsSection() {
 
                 {/* Feature Grid */}
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                    {features.map((feature) => {
+                    {features.map((feature, index) => {
                         const Icon = feature.icon;
 
                         return (
-                            <div
+                            <motion.div
                                 key={feature.title}
+                                initial={{ opacity: 0, y: 30, scale: 0.97 }}
+                                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                                viewport={{ once: true, amount: 0.2 }}
+                                transition={{
+                                    duration: 0.6,
+                                    delay: index * 0.08,
+                                    ease: [0.22, 1, 0.36, 1],
+                                }}
+                                whileHover={{ y: -8 }}
                                 className="group relative rounded-lg border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-600/5 sm:p-8"
                             >
                                 {/* Icon */}
@@ -76,7 +88,8 @@ export default function WhyChooseUsSection() {
                                 <p className="text-gray-600 leading-relaxed text-sm">
                                     {feature.description}
                                 </p>
-                            </div>
+                                <div className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-200/80 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                            </motion.div>
                         );
                     })}
                 </div>

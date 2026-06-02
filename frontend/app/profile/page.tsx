@@ -18,6 +18,7 @@ import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
 import AuthGuard from "@/app/components/auth/AuthGuard";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import {
     fetchOrders,
     fetchProfile,
@@ -32,9 +33,14 @@ import {
     getOrderStatusLabel,
     getPaymentStatusLabel,
 } from "@/lib/order-status";
+import {
+    rememberCustomerOrderSnapshot,
+    syncCustomerOrderNotifications,
+} from "@/lib/order-notification";
 
 export default function Page() {
     const { setUser } = useAuth();
+    const { notify } = useToast();
     const searchParams = useSearchParams();
     const tab = searchParams?.get("tab");
     const [active, setActive] = useState(
@@ -43,7 +49,6 @@ export default function Page() {
     const [profile, setProfile] = useState<ProfileResponse["data"] | null>(null);
     const [orders, setOrders] = useState<OrderData[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [showToast, setShowToast] = useState(false);
     const [form, setForm] = useState({
         name: "",
         email: "",
@@ -131,31 +136,50 @@ export default function Page() {
                       }
                     : current,
             );
-            setShowToast(true);
-            setTimeout(() => setShowToast(false), 2500);
             setForm((prev) => ({
                 ...prev,
                 password: "",
                 confirmPassword: "",
             }));
+            notify({
+                tone: "success",
+                title: "Profil berhasil diperbarui",
+                message: "Informasi akun Anda sudah tersimpan dengan aman.",
+            });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal memperbarui profil.",
-            );
+            notify({
+                tone: "error",
+                title: "Gagal memperbarui profil",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal memperbarui profil.",
+            });
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleOrderUpdated = (updatedOrder: OrderData) => {
+        rememberCustomerOrderSnapshot(updatedOrder);
         setOrders((current) =>
             current.map((order) =>
                 order.id === updatedOrder.id ? updatedOrder : order,
             ),
         );
     };
+
+    useEffect(() => {
+        if (orders.length === 0) {
+            return;
+        }
+
+        const notifications = syncCustomerOrderNotifications(orders);
+
+        notifications.forEach((toast, index) => {
+            window.setTimeout(() => notify(toast), index * 220);
+        });
+    }, [notify, orders]);
 
     return (
         <AuthGuard loginPath="/customer/login">
@@ -368,13 +392,6 @@ export default function Page() {
                     </div>
                 </div>
 
-                {showToast && (
-                    <div className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-blue-200 bg-white px-6 py-3 text-sm font-semibold text-blue-700 shadow-lg shadow-blue-100">
-                        <CheckCircle2 className="h-5 w-5" />
-                        Personal information updated successfully
-                    </div>
-                )}
-
                 <Footer />
             </div>
         </AuthGuard>
@@ -434,6 +451,7 @@ function OrderHistoryCard({
     order: OrderData;
     onOrderUpdated: (order: OrderData) => void;
 }) {
+    const { notify } = useToast();
     const [isUploading, setIsUploading] = useState(false);
     const [selectedPaymentProof, setSelectedPaymentProof] = useState<{
         name: string;
@@ -462,6 +480,7 @@ function OrderHistoryCard({
         !isCancelledByAdmin &&
         !isExpired &&
         (isWaitingPayment || showRejectedPaymentAlert);
+    const showBankTransferAccount = canUploadPaymentProof;
 
     const handlePaymentProofChange = async (
         event: ChangeEvent<HTMLInputElement>,
@@ -493,11 +512,14 @@ function OrderHistoryCard({
                 };
             });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal membaca file bukti pembayaran.",
-            );
+            notify({
+                tone: "error",
+                title: "Gagal membaca bukti pembayaran",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal membaca file bukti pembayaran.",
+            });
         } finally {
             event.target.value = "";
         }
@@ -521,13 +543,20 @@ function OrderHistoryCard({
 
             setSelectedPaymentProof(null);
             onOrderUpdated(response.data);
-            alert(response.message);
+            notify({
+                tone: "success",
+                title: "Bukti pembayaran terkirim",
+                message: response.message,
+            });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal mengupload bukti pembayaran.",
-            );
+            notify({
+                tone: "error",
+                title: "Upload bukti gagal",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal mengupload bukti pembayaran.",
+            });
         } finally {
             setIsUploading(false);
         }
@@ -609,6 +638,46 @@ function OrderHistoryCard({
                     <OrderAlert variant={orderNotice.variant}>
                         {orderNotice.message}
                     </OrderAlert>
+                </div>
+            )}
+
+            {showBankTransferAccount && (
+                <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                        Detail Rekening Transfer
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                        Silakan transfer pembayaran ke rekening berikut sesuai total
+                        pesanan Anda.
+                    </p>
+
+                    <div className="mt-4 flex flex-col gap-4 rounded-xl border border-blue-200 bg-[linear-gradient(135deg,#eff6ff_0%,#dbeafe_100%)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0055B8] text-lg font-black tracking-[0.2em] text-white shadow-lg shadow-blue-200">
+                                BCA
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
+                                    Bank Tujuan
+                                </p>
+                                <p className="mt-1 text-lg font-bold text-slate-950">
+                                    Bank BCA
+                                </p>
+                                <p className="text-sm text-slate-600">
+                                    Transfer manual customer
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-blue-100 sm:min-w-[220px]">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                Nomor Rekening
+                            </p>
+                            <p className="mt-1 text-2xl font-black tracking-[0.14em] text-slate-950">
+                                8210997939
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 

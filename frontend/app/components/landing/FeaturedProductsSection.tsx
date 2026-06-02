@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { fetchFeaturedProducts, type ApiProduct } from "@/lib/store";
 
 export default function FeaturedProductsSection() {
@@ -85,26 +86,38 @@ export default function FeaturedProductsSection() {
                     </div>
                 ) : (
                     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                        {products.map((product) => (
-                            <Link
+                        {products.map((product, index) => (
+                            <motion.div
                                 key={product.id}
-                                href={`/product/${product.id}`}
-                                className="group block overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70"
+                                initial={{ opacity: 0, y: 28, scale: 0.98 }}
+                                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                                viewport={{ once: true, amount: 0.22 }}
+                                transition={{
+                                    duration: 0.6,
+                                    delay: index * 0.08,
+                                    ease: [0.22, 1, 0.36, 1],
+                                }}
                             >
-                                <div className="relative aspect-[4/5] overflow-hidden bg-blue-50">
-                                    {product.imageUrl ? (
-                                        <img
-                                            src={product.imageUrl}
-                                            alt={product.name}
-                                            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                                        />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-blue-600">
-                                            No Image
-                                        </div>
-                                    )}
-                                </div>
-                            </Link>
+                                <Link
+                                    href={`/product/${product.id}`}
+                                    className="group block overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/40 transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70"
+                                >
+                                    <div className="relative aspect-[4/5] overflow-hidden bg-blue-50">
+                                        {product.imageUrl ? (
+                                            <img
+                                                src={product.imageUrl}
+                                                alt={product.name}
+                                                className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-blue-600">
+                                                No Image
+                                            </div>
+                                        )}
+                                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(59,130,246,0)_0%,rgba(59,130,246,0.14)_100%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                                    </div>
+                                </Link>
+                            </motion.div>
                         ))}
                     </div>
                 )}

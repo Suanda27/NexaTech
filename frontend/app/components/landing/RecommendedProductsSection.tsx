@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
     fetchPersonalRecommendations,
@@ -114,8 +115,12 @@ export default function RecommendedProductsSection() {
                     </div>
                 ) : (
                     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                        {products.map((product) => (
-                            <ProductCard key={product.id} product={product} />
+                        {products.map((product, index) => (
+                            <ProductCard
+                                key={product.id}
+                                product={product}
+                                index={index}
+                            />
                         ))}
                     </div>
                 )}
@@ -124,9 +129,25 @@ export default function RecommendedProductsSection() {
     );
 }
 
-function ProductCard({ product }: { product: ApiProduct }) {
+function ProductCard({
+    product,
+    index,
+}: {
+    product: ApiProduct;
+    index: number;
+}) {
     return (
-        <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70">
+        <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, amount: 0.18 }}
+            transition={{
+                duration: 0.62,
+                delay: index * 0.08,
+                ease: [0.22, 1, 0.36, 1],
+            }}
+            className="group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70"
+        >
             <Link href={`/product/${product.id}`}>
                 <div className="relative aspect-[4/3] overflow-hidden bg-blue-50 p-2">
                     {product.imageUrl ? (
@@ -146,6 +167,7 @@ function ProductCard({ product }: { product: ApiProduct }) {
                     <span className="absolute left-5 top-5 rounded-lg bg-white/90 px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100 backdrop-blur">
                         {product.recommendationReason ?? product.category}
                     </span>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(59,130,246,0)_0%,rgba(59,130,246,0.14)_100%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 </div>
             </Link>
 
@@ -176,6 +198,6 @@ function ProductCard({ product }: { product: ApiProduct }) {
                     </Link>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 }

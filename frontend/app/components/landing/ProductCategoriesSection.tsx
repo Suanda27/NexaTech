@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { fetchCatalogCategories, type ApiCategory } from "@/lib/store";
 
 const categoryImageFallbacks: Record<string, string> = {
@@ -121,51 +122,63 @@ export default function ProductCategoriesSection() {
                     </div>
                 ) : (
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {categories.map((category) => {
+                        {categories.map((category, index) => {
                             const imageSrc = resolveCategoryImage(category);
 
                             return (
-                                <Link
+                                <motion.div
                                     key={category.id}
-                                    href={resolveCategoryHref(category)}
-                                    className="group relative h-64 overflow-hidden rounded-lg border border-blue-100 bg-slate-950 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/60 sm:h-72 md:h-80"
+                                    initial={{ opacity: 0, y: 34, scale: 0.98 }}
+                                    whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                                    viewport={{ once: true, amount: 0.18 }}
+                                    transition={{
+                                        duration: 0.65,
+                                        delay: index * 0.08,
+                                        ease: [0.22, 1, 0.36, 1],
+                                    }}
                                 >
-                                    {imageSrc ? (
-                                        <Image
-                                            src={imageSrc}
-                                            alt={category.name}
-                                            fill
-                                            unoptimized
-                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                            className="object-cover transition-transform duration-700 group-hover:scale-110"
-                                        />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center bg-blue-50 text-center text-sm font-semibold text-blue-700">
-                                            Gambar kategori belum tersedia
+                                    <Link
+                                        href={resolveCategoryHref(category)}
+                                        className="group relative block h-64 overflow-hidden rounded-lg border border-blue-100 bg-slate-950 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/60 sm:h-72 md:h-80"
+                                    >
+                                        {imageSrc ? (
+                                            <Image
+                                                src={imageSrc}
+                                                alt={category.name}
+                                                fill
+                                                unoptimized
+                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                                className="object-cover transition-transform duration-700 group-hover:scale-110"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center bg-blue-50 text-center text-sm font-semibold text-blue-700">
+                                                Gambar kategori belum tersedia
+                                            </div>
+                                        )}
+
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
+                                        <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(59,130,246,0)_0%,rgba(59,130,246,0.18)_100%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+                                        <div className="absolute inset-0 flex flex-col justify-between p-6 md:p-8">
+                                            <div className="flex justify-end">
+                                                <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                                                    {category.totalProducts} produk
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <h3 className="text-2xl font-semibold text-white transition-colors duration-300 group-hover:text-blue-300 md:text-3xl">
+                                                    {category.name}
+                                                </h3>
+
+                                                <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/90">
+                                                    Lihat produk
+                                                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                                </span>
+                                            </div>
                                         </div>
-                                    )}
-
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-
-                                    <div className="absolute inset-0 flex flex-col justify-between p-6 md:p-8">
-                                        <div className="flex justify-end">
-                                            <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
-                                                {category.totalProducts} produk
-                                            </span>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <h3 className="text-2xl font-semibold text-white transition-colors duration-300 group-hover:text-blue-300 md:text-3xl">
-                                                {category.name}
-                                            </h3>
-
-                                            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/90">
-                                                Lihat produk
-                                                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                                            </span>
-                                        </div>
-                                    </div>
-                                </Link>
+                                    </Link>
+                                </motion.div>
                             );
                         })}
                     </div>
