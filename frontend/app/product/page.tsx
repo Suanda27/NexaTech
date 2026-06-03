@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
+import { useToast } from "@/context/ToastContext";
 import { Search } from "lucide-react";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
@@ -22,6 +23,7 @@ import { ProductGrid } from "./components/ProductGrid";
 export default function ProductPage() {
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
+    const { notify } = useToast();
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [products, setProducts] = useState<ApiProduct[]>([]);
     const [meta, setMeta] = useState<PaginatedProductsResponse["meta"] | null>(
@@ -120,20 +122,36 @@ export default function ProductPage() {
 
     const handleAddToCart = async (productId: number) => {
         if (!user) {
-            alert("Silahkan login terlebih dahulu untuk menambahkan produk ke cart.");
+            notify({
+                tone: "warning",
+                title: "Login diperlukan",
+                message:
+                    "Silahkan login terlebih dahulu untuk menambahkan produk ke keranjang.",
+            });
             return;
         }
 
         try {
             await addCartItem(productId, 1);
             await refreshCartCount();
-            alert("Produk berhasil ditambahkan ke cart.");
+            const product = products.find((item) => item.id === productId);
+            notify({
+                tone: "cart",
+                title: "Produk masuk ke keranjang",
+                message: product
+                    ? `${product.name} berhasil ditambahkan ke keranjang Anda.`
+                    : "Produk berhasil ditambahkan ke keranjang Anda.",
+                durationMs: 3200,
+            });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal menambahkan produk ke cart.",
-            );
+            notify({
+                tone: "error",
+                title: "Gagal menambahkan produk",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal menambahkan produk ke keranjang.",
+            });
         }
     };
 

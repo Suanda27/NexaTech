@@ -14,6 +14,7 @@ import {
     AlertCircle,
     BellRing,
     CheckCircle2,
+    ShoppingCart,
     TriangleAlert,
     X,
 } from "lucide-react";
@@ -68,6 +69,15 @@ function getToastStyles(tone: AppToastTone) {
                 title: "text-amber-950",
                 body: "text-amber-900/75",
                 progress: "bg-amber-500",
+            };
+        case "cart":
+            return {
+                icon: CheckCircle2,
+                shell: "border-blue-200 bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_45%,#dbeafe_72%,#bfdbfe_100%)] shadow-blue-200/70",
+                badge: "bg-[linear-gradient(135deg,#2563eb_0%,#1d4ed8_100%)] text-white",
+                title: "text-blue-950",
+                body: "text-blue-900/80",
+                progress: "bg-[linear-gradient(90deg,#60a5fa_0%,#2563eb_100%)]",
             };
         default:
             return {
@@ -128,10 +138,21 @@ function ToastCard({
             }`}
         >
             <div className="flex items-start gap-3">
-                <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-lg ${styles.badge}`}
-                >
-                    <Icon className="h-5 w-5" />
+                <div className="relative">
+                    {toast.tone === "cart" && (
+                        <>
+                            <div className="absolute inset-0 rounded-2xl bg-blue-400/35 blur-md" />
+                            <div className="absolute inset-[-5px] rounded-[1.15rem] border border-blue-200/80" />
+                        </>
+                    )}
+                    <div
+                        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-lg ${styles.badge}`}
+                    >
+                        <Icon className="h-5 w-5" />
+                        {toast.tone === "cart" && (
+                            <ShoppingCart className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-white p-[2px] text-blue-600 shadow-sm" />
+                        )}
+                    </div>
                 </div>
 
                 <div className="min-w-0 flex-1">

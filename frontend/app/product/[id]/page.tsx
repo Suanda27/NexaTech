@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
+import { useToast } from "@/context/ToastContext";
 import AuthGuard from "@/app/components/auth/AuthGuard";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
@@ -29,6 +30,7 @@ export default function ProductDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
+    const { notify } = useToast();
     const [product, setProduct] = useState<ApiProduct | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -68,13 +70,21 @@ export default function ProductDetailPage() {
         try {
             await addCartItem(product.id, 1);
             await refreshCartCount();
-            alert("Produk berhasil ditambahkan ke cart.");
+            notify({
+                tone: "cart",
+                title: "Produk masuk ke keranjang",
+                message: `${product.name} berhasil ditambahkan ke keranjang Anda.`,
+                durationMs: 3200,
+            });
         } catch (error) {
-            alert(
-                error instanceof Error
-                    ? error.message
-                    : "Gagal menambahkan produk ke cart.",
-            );
+            notify({
+                tone: "error",
+                title: "Gagal menambahkan produk",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Gagal menambahkan produk ke keranjang.",
+            });
         }
     };
 

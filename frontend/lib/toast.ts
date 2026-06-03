@@ -1,6 +1,11 @@
 "use client";
 
-export type AppToastTone = "success" | "error" | "info" | "warning";
+export type AppToastTone =
+    | "success"
+    | "error"
+    | "info"
+    | "warning"
+    | "cart";
 
 export type AppToastInput = {
     title: string;
