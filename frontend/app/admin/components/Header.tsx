@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -59,8 +58,8 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
 
     return (
         <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/92 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-                <div className="flex min-w-0 items-center gap-3">
+            <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:gap-4 lg:px-8">
+                <div className="flex min-w-0 items-center gap-3 lg:flex-1">
                     <button
                         className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600 transition hover:bg-blue-100 lg:hidden"
                         onClick={onToggle}
@@ -68,31 +67,10 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                     >
                         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
-
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-100 shadow-sm">
-                            <Image
-                                src="/logoNexaTech.png"
-                                alt="NexaTech Logo"
-                                width={36}
-                                height={36}
-                                className="h-8 w-8 object-contain"
-                                priority
-                            />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="truncate text-base font-semibold text-slate-900">
-                                NexaTech Admin
-                            </p>
-                            <p className="truncate text-sm text-slate-500">
-                                Control panel management
-                            </p>
-                        </div>
-                    </div>
                 </div>
 
-                <div className="hidden flex-1 lg:block">
-                    <div className="relative mx-auto w-full max-w-xl">
+                <div className="hidden min-w-0 flex-1 lg:block">
+                    <div className="relative w-full max-w-2xl">
                         <Search
                             className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400"
                             size={18}
@@ -106,7 +84,7 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                 </div>
 
                 <div
-                    className="relative ml-auto flex shrink-0 items-center gap-3"
+                    className="relative ml-auto flex shrink-0 items-center gap-2 sm:gap-3"
                     ref={menuRef}
                 >
                     <div className="hidden min-w-0 sm:flex flex-col text-right">
