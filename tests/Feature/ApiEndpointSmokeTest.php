@@ -89,7 +89,8 @@ class ApiEndpointSmokeTest extends TestCase
 
         $this->getJson('/api/products/recommendations')
             ->assertOk()
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.recommendationReason', 'Produk acak');
 
         $this->getJson('/api/products?q=NexaBook&category='.$category->slug.'&sort=best_selling&per_page=8')
             ->assertOk()
@@ -105,13 +106,53 @@ class ApiEndpointSmokeTest extends TestCase
     public function test_customer_cart_profile_and_recommendation_endpoints_work(): void
     {
         $user = $this->createCustomerUser();
-        $category = $this->createCategory();
-        $product = $this->createProduct($category, [
+        $laptopCategory = $this->createCategory();
+        $accessoryCategory = $this->createCategory([
+            'nama_kategori' => 'Accessories',
+            'slug' => 'accessories',
+            'deskripsi' => 'Kategori aksesoris',
+        ]);
+        $laptop = $this->createProduct($laptopCategory, [
+            'name' => 'NexaBook Air',
+            'slug' => 'nexabook-air',
+            'sku' => 'SKU-LAP-001',
+            'price' => 12000000,
+            'stock' => 7,
+        ]);
+        $product = $this->createProduct($accessoryCategory, [
             'name' => 'NexaMouse',
             'slug' => 'nexamouse',
             'sku' => 'SKU-MOUSE-001',
             'price' => 250000,
             'stock' => 20,
+        ]);
+        $order = Order::query()->create([
+            'user_id' => $user->id,
+            'order_number' => 'ORD-RECO-001',
+            'first_name' => 'Reco',
+            'last_name' => 'User',
+            'address' => 'Batam',
+            'city' => 'Batam',
+            'postal_code' => '29433',
+            'payment_method' => Order::PAYMENT_METHOD_COD,
+            'payment_status' => Order::PAYMENT_STATUS_PAID,
+            'status' => Order::STATUS_DELIVERED,
+            'subtotal' => $laptop->price,
+            'shipping_fee' => 0,
+            'tax_amount' => 0,
+            'total' => $laptop->price,
+            'ordered_at' => now(),
+            'delivered_at' => now(),
+        ]);
+
+        OrderItem::query()->create([
+            'order_id' => $order->id,
+            'product_id' => $laptop->id,
+            'product_name' => $laptop->name,
+            'product_image_url' => $laptop->image_url,
+            'unit_price' => $laptop->price,
+            'quantity' => 1,
+            'total_price' => $laptop->price,
         ]);
 
         $this->actingAs($user, 'sanctum')
@@ -148,7 +189,9 @@ class ApiEndpointSmokeTest extends TestCase
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/recommendations')
             ->assertOk()
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $product->id)
+            ->assertJsonPath('data.0.recommendationReason', 'Pelengkap laptop Anda');
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/profile')

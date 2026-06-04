@@ -127,7 +127,7 @@ class CatalogController extends Controller
     public function publicRecommendations()
     {
         return response()->json([
-            'data' => $this->popularRecommendations(),
+            'data' => $this->randomRecommendations(),
         ]);
     }
 
@@ -163,16 +163,6 @@ class CatalogController extends Controller
             ->whereIn('id', $purchasedProductIds)
             ->get();
 
-        $searchedKeywords = ProductSearch::query()
-            ->where('user_id', $user->id)
-            ->latest()
-            ->take(10)
-            ->pluck('keyword')
-            ->map(fn (string $keyword) => Str::lower(trim($keyword)))
-            ->filter()
-            ->unique()
-            ->values();
-
         $products = Product::query()
             ->with('category')
             ->withSum('orderItems as sold_quantity', 'quantity')
@@ -195,19 +185,10 @@ class CatalogController extends Controller
         $rankedProducts = $products
             ->map(function (Product $product) use (
                 $hasLaptopPurchase,
-                $purchasedCategoryIds,
-                $searchedKeywords
+                $purchasedCategoryIds
             ) {
-                $score = (int) ($product->sold_quantity ?? 0);
-                $reason = 'Produk populer di katalog';
-
-                foreach ($searchedKeywords as $keyword) {
-                    if ($this->matchesAnyKeyword($product, [$keyword])) {
-                        $score += 60;
-                        $reason = "Sesuai pencarian Anda: {$keyword}";
-                        break;
-                    }
-                }
+                $score = 0;
+                $reason = null;
 
                 if ($purchasedCategoryIds->contains($product->category_id)) {
                     $score += 35;
@@ -230,10 +211,14 @@ class CatalogController extends Controller
                     $reason = 'Pelengkap laptop Anda';
                 }
 
+                if ($score > 0) {
+                    $score += min((int) ($product->sold_quantity ?? 0), 20);
+                }
+
                 return [
                     'product' => $product,
                     'score' => $score,
-                    'reason' => $reason,
+                    'reason' => $reason ?? 'Berdasarkan riwayat pembelian',
                 ];
             })
             ->filter(fn (array $item) => $item['score'] > 0)
@@ -243,7 +228,7 @@ class CatalogController extends Controller
 
         if ($rankedProducts->isEmpty()) {
             return response()->json([
-                'data' => $this->popularRecommendations(),
+                'data' => $this->randomRecommendations(),
             ]);
         }
 
@@ -290,21 +275,17 @@ class CatalogController extends Controller
         ]);
     }
 
-    private function popularRecommendations(int $limit = 8)
+    private function randomRecommendations(int $limit = 8)
     {
         return Product::query()
             ->with('category')
-            ->withSum('orderItems as sold_quantity', 'quantity')
             ->where('status', Product::STATUS_ACTIVE)
-            ->orderByDesc('sold_quantity')
-            ->latest()
+            ->inRandomOrder()
             ->take($limit)
             ->get()
             ->map(fn (Product $product) => [
                 ...$this->serializeProduct($product),
-                'recommendationReason' => ((int) ($product->sold_quantity ?? 0)) > 0
-                    ? 'Produk terlaris'
-                    : 'Rekomendasi terbaru',
+                'recommendationReason' => 'Produk acak',
             ])
             ->values();
     }

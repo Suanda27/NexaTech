@@ -69,9 +69,9 @@ export default function RecommendedProductsSection() {
                             Rekomendasi yang mengikuti cara belanjamu.
                         </h2>
                         <p className="mt-4 max-w-2xl text-base leading-relaxed text-gray-600 sm:text-lg">
-                            Produk di bagian ini disusun dari histori pembelian,
-                            pencarian terbaru, kategori favorit, dan produk
-                            populer di katalog.
+                            Produk di bagian ini ditampilkan acak untuk guest,
+                            lalu menyesuaikan histori pembelian dan kategori
+                            pelengkap setelah kamu login.
                         </p>
                     </div>
 
@@ -82,12 +82,12 @@ export default function RecommendedProductsSection() {
                             </span>
                             <div>
                                 <p className="font-bold text-gray-950">
-                                    {user ? "Personalized picks" : "Popular picks"}
+                                    {user ? "Personalized picks" : "Random picks"}
                                 </p>
                                 <p className="mt-1 text-sm leading-relaxed text-gray-600">
                                     {user
-                                        ? "Jika kamu membeli laptop, aksesoris seperti mouse, keyboard, monitor, dan storage akan diprioritaskan."
-                                        : "Login untuk melihat rekomendasi yang menyesuaikan pembelian dan pencarianmu."}
+                                        ? "Jika kamu membeli laptop, aksesoris seperti mouse, keyboard, headset, monitor, dan storage akan diprioritaskan."
+                                        : "Login untuk melihat rekomendasi yang menyesuaikan riwayat pembelianmu."}
                                 </p>
                             </div>
                         </div>
