@@ -22,6 +22,16 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+        'finish_url' => env('MIDTRANS_FINISH_URL'),
+        'ca_bundle' => env('MIDTRANS_CA_BUNDLE'),
+        'mock_enabled' => env('MIDTRANS_MOCK_ENABLED', false),
+        'mock_auto_settle' => env('MIDTRANS_MOCK_AUTO_SETTLE', true),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

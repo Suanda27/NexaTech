@@ -27,6 +27,8 @@ Route::get('/products/featured', [CatalogController::class, 'featuredProducts'])
 Route::get('/products/recommendations', [CatalogController::class, 'publicRecommendations']);
 Route::get('/products', [CatalogController::class, 'products']);
 Route::get('/products/{product}', [CatalogController::class, 'show']);
+Route::get('/payments/midtrans/config', [OrderController::class, 'midtransConfig']);
+Route::post('/payments/midtrans/notification', [OrderController::class, 'midtransNotification']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cart', [CartController::class, 'index']);
@@ -42,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::post('/orders/{order}/payment-proof', [OrderController::class, 'submitPaymentProof']);
+    Route::post('/orders/{order}/midtrans-cancel', [OrderController::class, 'cancelPendingMidtrans']);
 
     Route::post('/product-searches', [CatalogController::class, 'storeSearch']);
     Route::get('/recommendations', [CatalogController::class, 'recommendations']);

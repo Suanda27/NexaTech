@@ -90,12 +90,9 @@ class OrderAdminService
 
     protected function markDelivered(Order $order): Order
     {
-        if (
-            $order->payment_method === Order::PAYMENT_METHOD_BANK_TRANSFER
-            && $order->payment_status !== Order::PAYMENT_STATUS_PAID
-        ) {
+        if ($order->payment_method !== Order::PAYMENT_METHOD_COD && $order->payment_status !== Order::PAYMENT_STATUS_PAID) {
             throw ValidationException::withMessages([
-                'status' => ['Order transfer hanya bisa dikirim setelah pembayaran disetujui.'],
+                'status' => ['Order hanya bisa dikirim setelah pembayaran lunas.'],
             ]);
         }
 
@@ -131,7 +128,7 @@ class OrderAdminService
                 ->unique()
                 ->values();
 
-            /** @var \Illuminate\Support\Collection<int, Product> $lockedProducts */
+            /** @var Collection<int, Product> $lockedProducts */
             $lockedProducts = Product::query()
                 ->whereIn('id', $productIds)
                 ->lockForUpdate()

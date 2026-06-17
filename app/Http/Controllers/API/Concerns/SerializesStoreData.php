@@ -75,7 +75,7 @@ trait SerializesStoreData
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, \App\Models\OrderItem> $items
+     * @param Collection<int, \App\Models\OrderItem> $items
      */
     protected function serializeOrderItems(Collection $items): array
     {
@@ -108,6 +108,10 @@ trait SerializesStoreData
             'paymentMethodKey' => $order->payment_method,
             'paymentStatus' => $this->paymentStatusLabel($order->payment_status),
             'paymentStatusKey' => $order->payment_status,
+            'midtransSnapToken' => $order->midtrans_snap_token,
+            'midtransRedirectUrl' => $order->midtrans_redirect_url,
+            'midtransTransactionStatus' => $order->midtrans_transaction_status,
+            'midtransPaymentType' => $order->midtrans_payment_type,
             'status' => $this->orderStatusLabel($order->status),
             'statusKey' => $order->status,
             'declineReason' => $order->payment_rejection_reason ?? $order->cancellation_reason ?? $order->decline_reason,
@@ -142,9 +146,11 @@ trait SerializesStoreData
 
     protected function paymentMethodLabel(string $paymentMethod): string
     {
-        return $paymentMethod === Order::PAYMENT_METHOD_BANK_TRANSFER
-            ? 'Bank Transfer'
-            : 'COD';
+        return match ($paymentMethod) {
+            Order::PAYMENT_METHOD_BANK_TRANSFER => 'Bank Transfer',
+            Order::PAYMENT_METHOD_MIDTRANS => 'Midtrans',
+            default => 'COD',
+        };
     }
 
     protected function paymentStatusLabel(string $paymentStatus): string

@@ -7,11 +7,50 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
+use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string $order_number
+ * @property string $first_name
+ * @property string $last_name
+ * @property string $address
+ * @property string $city
+ * @property string $postal_code
+ * @property string $payment_method
+ * @property string $payment_status
+ * @property string $status
+ * @property string|null $payment_proof
+ * @property string|null $midtrans_order_id
+ * @property string|null $midtrans_snap_token
+ * @property string|null $midtrans_redirect_url
+ * @property string|null $midtrans_transaction_status
+ * @property string|null $midtrans_payment_type
+ * @property string|null $payment_rejection_reason
+ * @property string|null $cancellation_reason
+ * @property string|null $decline_reason
+ * @property int $subtotal
+ * @property int $shipping_fee
+ * @property int $tax_amount
+ * @property int $total
+ * @property \Illuminate\Support\Carbon|null $expires_at
+ * @property \Illuminate\Support\Carbon|null $payment_submitted_at
+ * @property \Illuminate\Support\Carbon|null $payment_verified_at
+ * @property \Illuminate\Support\Carbon|null $ordered_at
+ * @property \Illuminate\Support\Carbon|null $stock_reserved_at
+ * @property \Illuminate\Support\Carbon|null $stock_released_at
+ * @property \Illuminate\Support\Carbon|null $delivered_at
+ * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property \Illuminate\Support\Carbon|null $declined_at
+ *
+ * @property \App\Models\User $user
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\OrderItem[] $items
+ */
 class Order extends Model
 {
     use HasFactory;
@@ -21,6 +60,7 @@ class Order extends Model
 
     public const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
     public const PAYMENT_METHOD_COD = 'cod';
+    public const PAYMENT_METHOD_MIDTRANS = 'midtrans';
     public const PAYMENT_PROOF_DISK = 'public';
     public const PAYMENT_PROOF_DIRECTORY = 'payment-proofs';
 
@@ -49,6 +89,11 @@ class Order extends Model
         'payment_status',
         'status',
         'payment_proof',
+        'midtrans_order_id',
+        'midtrans_snap_token',
+        'midtrans_redirect_url',
+        'midtrans_transaction_status',
+        'midtrans_payment_type',
         'payment_rejection_reason',
         'cancellation_reason',
         'decline_reason',
@@ -107,7 +152,10 @@ class Order extends Model
             return $this->payment_proof;
         }
 
-        return Storage::disk(self::PAYMENT_PROOF_DISK)->url($this->payment_proof);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk(self::PAYMENT_PROOF_DISK);
+
+        return $disk->url($this->payment_proof);
     }
 
     public function storePaymentProof(UploadedFile $file): string
@@ -138,7 +186,7 @@ class Order extends Model
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, Product> $lockedProducts
+     * @param Collection<int, Product> $lockedProducts
      */
     public function releaseReservedStock(Collection $lockedProducts): void
     {
@@ -176,7 +224,10 @@ class Order extends Model
     {
         static::query()
             ->with('items')
-            ->where('payment_method', self::PAYMENT_METHOD_BANK_TRANSFER)
+            ->whereIn('payment_method', [
+                self::PAYMENT_METHOD_BANK_TRANSFER,
+                self::PAYMENT_METHOD_MIDTRANS,
+            ])
             ->whereIn('payment_status', [
                 self::PAYMENT_STATUS_WAITING_PAYMENT,
                 self::PAYMENT_STATUS_REJECTED,

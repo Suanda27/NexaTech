@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class OrderCheckoutService
 {
-    public function createFromCart(User $user, array $payload): Order
+    public function createFromCart(User $user, array $payload, ?callable $afterOrderCreated = null): Order
     {
         $cartItems = CartItem::query()
             ->with('product')
@@ -27,7 +27,7 @@ class OrderCheckoutService
             ]);
         }
 
-        return DB::transaction(function () use ($cartItems, $user, $payload): Order {
+        return DB::transaction(function () use ($cartItems, $user, $payload, $afterOrderCreated): Order {
             $lockedProducts = $this->lockProductsForCart($cartItems);
             $totals = $this->calculateTotals($cartItems, $lockedProducts, $payload['payment_method']);
 
@@ -40,10 +40,16 @@ class OrderCheckoutService
                 'city' => $payload['city'],
                 'postal_code' => $payload['postal_code'],
                 'payment_method' => $payload['payment_method'],
-                'payment_status' => $payload['payment_method'] === Order::PAYMENT_METHOD_BANK_TRANSFER
+                'payment_status' => in_array($payload['payment_method'], [
+                    Order::PAYMENT_METHOD_BANK_TRANSFER,
+                    Order::PAYMENT_METHOD_MIDTRANS,
+                ], true)
                     ? Order::PAYMENT_STATUS_WAITING_PAYMENT
                     : Order::PAYMENT_STATUS_UNPAID,
-                'status' => $payload['payment_method'] === Order::PAYMENT_METHOD_BANK_TRANSFER
+                'status' => in_array($payload['payment_method'], [
+                    Order::PAYMENT_METHOD_BANK_TRANSFER,
+                    Order::PAYMENT_METHOD_MIDTRANS,
+                ], true)
                     ? Order::STATUS_PENDING
                     : Order::STATUS_PROCESSING,
                 'payment_proof' => null,
@@ -51,7 +57,10 @@ class OrderCheckoutService
                 'shipping_fee' => $totals['shipping_fee'],
                 'tax_amount' => $totals['tax_amount'],
                 'total' => $totals['total'],
-                'expires_at' => $payload['payment_method'] === Order::PAYMENT_METHOD_BANK_TRANSFER
+                'expires_at' => in_array($payload['payment_method'], [
+                    Order::PAYMENT_METHOD_BANK_TRANSFER,
+                    Order::PAYMENT_METHOD_MIDTRANS,
+                ], true)
                     ? now()->addHours(Order::TRANSFER_PAYMENT_WINDOW_HOURS)
                     : null,
                 'ordered_at' => now(),
@@ -81,6 +90,10 @@ class OrderCheckoutService
                 $this->reserveProductStock($product, $item->quantity);
             }
 
+            if ($afterOrderCreated !== null) {
+                $order = $afterOrderCreated($order) ?? $order;
+            }
+
             CartItem::query()
                 ->where('user_id', $user->id)
                 ->delete();
@@ -107,9 +120,60 @@ class OrderCheckoutService
         return $order->fresh()->load('items');
     }
 
+    public function cancelPendingMidtransOrder(Order $order, User $user): Order
+    {
+        return DB::transaction(function () use ($order, $user): Order {
+            /** @var Order $lockedOrder */
+            $lockedOrder = Order::query()
+                ->with('items')
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedOrder->user_id !== $user->id) {
+                abort(404);
+            }
+
+            if (
+                $lockedOrder->payment_method !== Order::PAYMENT_METHOD_MIDTRANS
+                || $lockedOrder->payment_status !== Order::PAYMENT_STATUS_WAITING_PAYMENT
+                || $lockedOrder->status !== Order::STATUS_PENDING
+            ) {
+                throw ValidationException::withMessages([
+                    'order' => ['Order ini sudah tidak bisa dibatalkan dari popup pembayaran.'],
+                ]);
+            }
+
+            $productIds = $lockedOrder->items
+                ->pluck('product_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $lockedProducts = Product::query()
+                ->whereIn('id', $productIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $lockedOrder->releaseReservedStock($lockedProducts);
+            $this->restoreOrderItemsToCart($lockedOrder, $user->id);
+
+            $lockedOrder->forceFill([
+                'payment_status' => Order::PAYMENT_STATUS_EXPIRED,
+                'status' => Order::STATUS_CANCELLED,
+                'cancelled_at' => now(),
+                'cancellation_reason' => 'Popup pembayaran Midtrans ditutup oleh customer.',
+                'decline_reason' => 'Popup pembayaran Midtrans ditutup oleh customer.',
+            ])->save();
+
+            return $lockedOrder->fresh()->load('items');
+        });
+    }
+
     /**
-     * @param \Illuminate\Support\Collection<int, CartItem> $cartItems
-     * @return \Illuminate\Support\Collection<int, Product>
+     * @param Collection<int, CartItem> $cartItems
+     * @return Collection<int, Product>
      */
     protected function lockProductsForCart(Collection $cartItems): Collection
     {
@@ -127,8 +191,8 @@ class OrderCheckoutService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, CartItem> $cartItems
-     * @param \Illuminate\Support\Collection<int, Product> $lockedProducts
+     * @param Collection<int, CartItem> $cartItems
+     * @param Collection<int, Product> $lockedProducts
      * @return array{subtotal:int, shipping_fee:int, tax_amount:int, total:int}
      */
     protected function calculateTotals(
@@ -189,6 +253,23 @@ class OrderCheckoutService
         }
 
         $product->save();
+    }
+
+    protected function restoreOrderItemsToCart(Order $order, int $userId): void
+    {
+        foreach ($order->items as $item) {
+            if (!$item->product_id) {
+                continue;
+            }
+
+            $cartItem = CartItem::query()->firstOrNew([
+                'user_id' => $userId,
+                'product_id' => $item->product_id,
+            ]);
+
+            $cartItem->quantity = ($cartItem->exists ? $cartItem->quantity : 0) + (int) $item->quantity;
+            $cartItem->save();
+        }
     }
 
     protected function guardPaymentProofSubmission(Order $order): void

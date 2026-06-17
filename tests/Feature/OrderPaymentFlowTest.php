@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -70,6 +71,125 @@ class OrderPaymentFlowTest extends TestCase
         ]);
     }
 
+    public function test_midtrans_order_creates_snap_transaction(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+        config()->set('services.midtrans.is_production', false);
+
+        Http::fake([
+            'app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-test',
+                'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-test',
+            ]),
+        ]);
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->assertCreated()
+            ->assertJsonPath('data.paymentMethodKey', Order::PAYMENT_METHOD_MIDTRANS)
+            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_WAITING_PAYMENT)
+            ->assertJsonPath('data.midtransSnapToken', 'snap-token-test')
+            ->assertJsonPath('data.midtransRedirectUrl', 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-test');
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions'
+            && $request['transaction_details']['gross_amount'] === 450000);
+    }
+
+    public function test_midtrans_checkout_keeps_cart_when_snap_transaction_fails(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+
+        Http::fake([
+            'app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'error_messages' => ['Midtrans error'],
+            ], 500),
+        ]);
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Gagal membuat transaksi Midtrans. Cek konfigurasi server key.');
+
+        $this->assertDatabaseHas('cart_items', [
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'stock' => 10,
+        ]);
+    }
+
+    public function test_midtrans_settlement_notification_marks_order_as_paid(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $order = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+            ]));
+
+        $orderId = (string) $order->json('data.id');
+        $midtransOrderId = 'NEXA-'.$orderId.'-TEST';
+
+        Order::query()->whereKey($orderId)->update([
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'midtrans_order_id' => $midtransOrderId,
+        ]);
+
+        $grossAmount = '450000.00';
+
+        $this->postJson('/api/payments/midtrans/notification', [
+            'order_id' => $midtransOrderId,
+            'status_code' => '200',
+            'gross_amount' => $grossAmount,
+            'signature_key' => hash('sha512', $midtransOrderId.'200'.$grossAmount.'SB-Mid-server-test'),
+            'transaction_status' => 'settlement',
+            'payment_type' => 'bank_transfer',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'payment_status' => Order::PAYMENT_STATUS_PAID,
+            'status' => Order::STATUS_PROCESSING,
+            'midtrans_transaction_status' => 'settlement',
+            'midtrans_payment_type' => 'bank_transfer',
+        ]);
+    }
+
     public function test_customer_can_submit_payment_proof_after_checkout(): void
     {
         Storage::fake(Order::PAYMENT_PROOF_DISK);
@@ -100,7 +220,10 @@ class OrderPaymentFlowTest extends TestCase
         $order = Order::query()->findOrFail($orderId);
 
         $this->assertNotNull($order->payment_proof);
-        Storage::disk(Order::PAYMENT_PROOF_DISK)->assertExists($order->payment_proof);
+
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
+        $storage = Storage::disk(Order::PAYMENT_PROOF_DISK);
+        $storage->assertExists($order->payment_proof);
     }
 
     public function test_admin_can_approve_verified_transfer_payment(): void

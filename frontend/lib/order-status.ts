@@ -82,6 +82,7 @@ export function getOrderNotice(order: {
     cancellationReason?: string | null;
 }) {
     const isTransferOrder = order.paymentMethodKey === "bank_transfer";
+    const isMidtransOrder = order.paymentMethodKey === "midtrans";
     const isCancelledByAdmin =
         order.statusKey === "cancelled" && order.paymentStatusKey !== "expired";
 
@@ -132,6 +133,14 @@ export function getOrderNotice(order: {
             variant: "warning" as const,
             message:
                 "Pesanan menunggu pembayaran. Upload bukti transfer sebelum deadline agar admin bisa memverifikasinya.",
+        };
+    }
+
+    if (isMidtransOrder && order.paymentStatusKey === "waiting_payment") {
+        return {
+            variant: "warning" as const,
+            message:
+                "Pesanan menunggu pembayaran Midtrans. Selesaikan pembayaran dari halaman Midtrans agar status diperbarui otomatis.",
         };
     }
 

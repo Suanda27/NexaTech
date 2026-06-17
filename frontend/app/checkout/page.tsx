@@ -4,10 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
-    BadgeCheck,
-    Banknote,
-    CreditCard,
     Home,
+    LoaderCircle,
     Mail,
     MapPin,
     PackageCheck,
@@ -22,24 +20,98 @@ import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
 import AuthGuard from "@/app/components/auth/AuthGuard";
-import { OrderPaymentGuide } from "@/app/components/profile/OrderAlert";
 import {
+    cancelPendingMidtransOrder,
     createOrder,
+    fetchMidtransConfig,
     fetchCart,
     fetchProfile,
     type CartResponse,
 } from "@/lib/store";
 import { queueFlashToast } from "@/lib/toast";
 
+type MidtransSnapResult = {
+    order_id?: string;
+    payment_type?: string;
+    transaction_status?: string;
+    status_code?: string;
+};
+
+type MidtransSnap = {
+    pay: (
+        token: string,
+        callbacks: {
+            onSuccess?: (result: MidtransSnapResult) => void;
+            onPending?: (result: MidtransSnapResult) => void;
+            onError?: (result: MidtransSnapResult) => void;
+            onClose?: () => void;
+        },
+    ) => void;
+};
+
+declare global {
+    interface Window {
+        snap?: MidtransSnap;
+        midtransSnapScriptPromise?: Promise<void>;
+    }
+}
+
+async function loadMidtransSnap() {
+    if (typeof window === "undefined") {
+        throw new Error("Popup pembayaran hanya bisa dibuka di browser.");
+    }
+
+    if (window.snap) {
+        return;
+    }
+
+    if (window.midtransSnapScriptPromise) {
+        return window.midtransSnapScriptPromise;
+    }
+
+    window.midtransSnapScriptPromise = fetchMidtransConfig().then(({ data }) => {
+        if (!data.clientKey) {
+            throw new Error("MIDTRANS_CLIENT_KEY belum dikonfigurasi.");
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            const existingScript = document.getElementById("midtrans-snap-script");
+
+            if (existingScript) {
+                existingScript.addEventListener("load", () => resolve(), {
+                    once: true,
+                });
+                existingScript.addEventListener(
+                    "error",
+                    () => reject(new Error("Gagal memuat popup pembayaran Midtrans.")),
+                    { once: true },
+                );
+                return;
+            }
+
+            const script = document.createElement("script");
+            script.id = "midtrans-snap-script";
+            script.src = data.snapUrl;
+            script.async = true;
+            script.dataset.clientKey = data.clientKey;
+            script.onload = () => resolve();
+            script.onerror = () =>
+                reject(new Error("Gagal memuat popup pembayaran Midtrans."));
+            document.body.appendChild(script);
+        });
+    });
+
+    return window.midtransSnapScriptPromise;
+}
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
     const { notify } = useToast();
-    const [payment, setPayment] = useState<"bank_transfer" | "cod">(
-        "bank_transfer",
-    );
+    const payment = "midtrans" as const;
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isPaymentPopupOpening, setIsPaymentPopupOpening] = useState(false);
     const [cart, setCart] = useState<CartResponse>({
         items: [],
         summary: {
@@ -62,41 +134,48 @@ export default function CheckoutPage() {
         let mounted = true;
 
         const loadData = async () => {
-            try {
-                const [cartResponse, profileResponse] = await Promise.all([
-                    fetchCart(),
-                    fetchProfile(),
-                ]);
+            const [cartResult, profileResult] = await Promise.allSettled([
+                fetchCart(),
+                fetchProfile(),
+            ]);
 
-                if (!mounted) {
-                    return;
-                }
+            if (!mounted) {
+                return;
+            }
 
-                setCart(cartResponse);
+            if (cartResult.status === "fulfilled") {
+                setCart(cartResult.value);
+            } else {
+                notify({
+                    tone: "error",
+                    title: "Cart gagal dimuat",
+                    message:
+                        cartResult.reason instanceof Error
+                            ? cartResult.reason.message
+                            : "Tidak bisa memuat item cart.",
+                });
+            }
 
-                const fullName = profileResponse.data.user.name?.trim() ?? "";
+            if (profileResult.status === "fulfilled") {
+                const fullName = profileResult.value.data.user.name?.trim() ?? "";
                 const parts = fullName.split(/\s+/).filter(Boolean);
 
                 setForm({
                     firstName: parts[0] ?? "",
                     lastName: parts.slice(1).join(" "),
-                    address: profileResponse.data.user.address ?? "",
+                    address: profileResult.value.data.user.address ?? "",
                     city: "",
                     postalCode: "",
                 });
-            } catch {
-                if (mounted) {
-                    setCart({
-                        items: [],
-                        summary: {
-                            subtotal: 0,
-                            shipping: 0,
-                            tax: 0,
-                            total: 0,
-                            itemCount: 0,
-                        },
-                    });
-                }
+            } else {
+                notify({
+                    tone: "error",
+                    title: "Profil gagal dimuat",
+                    message:
+                        profileResult.reason instanceof Error
+                            ? profileResult.reason.message
+                            : "Silakan isi data pengiriman secara manual.",
+                });
             }
         };
 
@@ -105,7 +184,7 @@ export default function CheckoutPage() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [notify]);
 
     const handlePlaceOrder = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -120,20 +199,137 @@ export default function CheckoutPage() {
                 postal_code: form.postalCode,
                 payment_method: payment,
             });
+            const restoreCancelledMidtransOrder = async () => {
+                await cancelPendingMidtransOrder(response.data.id);
+                const restoredCart = await fetchCart();
+                setCart(restoredCart);
+                await refreshCartCount();
+            };
+
+            if (
+                response.data.paymentMethodKey === "midtrans" &&
+                response.data.midtransSnapToken
+            ) {
+                if (response.data.midtransSnapToken.startsWith("mock-")) {
+                    await refreshCartCount();
+                    queueFlashToast({
+                        tone: "success",
+                        title: "Checkout berhasil",
+                        message:
+                            "Mode mock Midtrans aktif. Order sudah dibuat tanpa membuka halaman baru.",
+                        durationMs: 5200,
+                    });
+                    router.push("/profile?tab=orders");
+                    return;
+                }
+
+                setIsPaymentPopupOpening(true);
+                await loadMidtransSnap();
+
+                if (!window.snap) {
+                    throw new Error("Popup pembayaran Midtrans belum siap.");
+                }
+
+                await refreshCartCount();
+
+                await new Promise<void>((resolve, reject) => {
+                    let isOrderFinalized = false;
+                    const cancelOrderAndRestore = async (
+                        title: string,
+                        message: string,
+                    ) => {
+                        if (isOrderFinalized) {
+                            return;
+                        }
+
+                        isOrderFinalized = true;
+                        await restoreCancelledMidtransOrder();
+                        notify({
+                            tone: "error",
+                            title,
+                            message,
+                        });
+                    };
+
+                    window.snap?.pay(response.data.midtransSnapToken ?? "", {
+                        onSuccess: () => {
+                            if (isOrderFinalized) {
+                                return;
+                            }
+
+                            isOrderFinalized = true;
+                            queueFlashToast({
+                                tone: "success",
+                                title: "Pembayaran berhasil",
+                                message:
+                                    "Pembayaran Midtrans selesai. Status order akan diperbarui otomatis.",
+                                durationMs: 5200,
+                            });
+                            router.push("/profile?tab=orders");
+                            resolve();
+                        },
+                        onPending: () => {
+                            void (async () => {
+                                try {
+                                    await cancelOrderAndRestore(
+                                        "Pembayaran belum selesai",
+                                        "Metode pembayaran sudah dipilih, tetapi transaksi belum dibayar. Order dibatalkan dan item dikembalikan ke cart.",
+                                    );
+                                    resolve();
+                                } catch (cancelError) {
+                                    reject(
+                                        cancelError instanceof Error
+                                            ? cancelError
+                                            : new Error("Gagal membatalkan order Midtrans."),
+                                    );
+                                }
+                            })();
+                        },
+                        onError: () => {
+                            void (async () => {
+                                try {
+                                    await cancelOrderAndRestore(
+                                        "Pembayaran dibatalkan",
+                                        "Pembayaran Midtrans gagal diproses. Order dibatalkan dan item dikembalikan ke cart.",
+                                    );
+                                    resolve();
+                                } catch (cancelError) {
+                                    reject(
+                                        cancelError instanceof Error
+                                            ? cancelError
+                                            : new Error("Pembayaran Midtrans gagal diproses."),
+                                    );
+                                }
+                            })();
+                        },
+                        onClose: () => {
+                            void (async () => {
+                                try {
+                                    await cancelOrderAndRestore(
+                                        "Pembayaran dibatalkan",
+                                        "Popup Midtrans ditutup. Order tidak dilanjutkan dan item sudah kembali ke cart.",
+                                    );
+                                    resolve();
+                                } catch (cancelError) {
+                                    reject(
+                                        cancelError instanceof Error
+                                            ? cancelError
+                                            : new Error("Gagal membatalkan order Midtrans."),
+                                    );
+                                }
+                            })();
+                        },
+                    });
+                });
+                return;
+            }
 
             await refreshCartCount();
-            const deadlineMessage =
-                response.data.paymentMethodKey === "bank_transfer" &&
-                response.data.paymentDeadline
-                    ? `Upload bukti transfer sebelum ${response.data.paymentDeadline} dari halaman order Anda.`
-                    : "";
-
             queueFlashToast({
                 tone: "success",
                 title: "Checkout berhasil",
-                message: deadlineMessage
-                    ? `Pesanan berhasil dibuat. ${deadlineMessage}`
-                    : "Pesanan berhasil dibuat dan siap diproses.",
+                message:
+                    "Pesanan berhasil dibuat. Silakan cek status pembayaran di halaman profile.",
                 durationMs: 5200,
             });
             router.push("/profile?tab=orders");
@@ -148,32 +344,11 @@ export default function CheckoutPage() {
             });
         } finally {
             setIsSubmitting(false);
+            setIsPaymentPopupOpening(false);
         }
     };
 
-    const paymentMethods = [
-        {
-            id: "bank_transfer" as const,
-            title: "Bank Transfer",
-            description:
-                "Checkout dulu, lalu upload bukti pembayaran dari halaman order sebelum deadline berakhir.",
-            icon: CreditCard,
-        },
-        {
-            id: "cod" as const,
-            title: "Cash on Delivery",
-            description: "COD hanya tersedia untuk total belanja sampai Rp 300.000.",
-            icon: Banknote,
-        },
-    ];
-
-    const isCodAllowed = cart.summary.total <= 300000;
-
-    useEffect(() => {
-        if (!isCodAllowed && payment === "cod") {
-            setPayment("bank_transfer");
-        }
-    }, [isCodAllowed, payment]);
+    const isCartEmpty = cart.items.length === 0;
 
     const inputClass =
         "w-full rounded-lg border border-gray-200 bg-white py-3 pl-11 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
@@ -193,9 +368,9 @@ export default function CheckoutPage() {
                                 Complete Your Order
                             </h1>
                             <p className="mt-2 text-sm text-gray-500">
-                                Order transfer akan menunggu pembayaran lebih
-                                dulu, lalu diverifikasi admin setelah customer
-                                mengupload bukti transfer.
+                                Pembayaran akan diproses langsung melalui Midtrans.
+                                Setelah checkout, popup pembayaran akan tampil di
+                                halaman ini tanpa membuka link baru.
                             </p>
                         </div>
 
@@ -310,86 +485,24 @@ export default function CheckoutPage() {
                                 </div>
                             </section>
 
-                            <section className="overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/50">
-                                <div className="border-b border-blue-100 bg-blue-50/70 p-5">
-                                    <div className="flex items-center gap-3">
-                                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm ring-1 ring-blue-100">
-                                            <CreditCard className="h-5 w-5" />
-                                        </span>
-                                        <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                                                Payment
-                                            </p>
-                                            <h2 className="font-bold text-gray-950">
-                                                Payment Method
-                                            </h2>
-                                        </div>
+                            <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-5 shadow-sm shadow-blue-100/40">
+                                <div className="flex items-start gap-3">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm ring-1 ring-blue-100">
+                                        <ShieldCheck className="h-5 w-5" />
+                                    </span>
+                                    <div>
+                                        <p className="font-bold text-gray-950">
+                                            Review your details before payment
+                                        </p>
+                                        <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                                            Pastikan alamat pengiriman sudah benar.
+                                            Setelah menekan Place Order, pembayaran
+                                            aman akan terbuka melalui popup Midtrans
+                                            di halaman ini.
+                                        </p>
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6">
-                                    {paymentMethods.map((method) => {
-                                        const Icon = method.icon;
-                                        const isActive = payment === method.id;
-
-                                        return (
-                                            <label
-                                                key={method.id}
-                                                className={`group relative cursor-pointer rounded-lg border p-4 transition duration-300 hover:-translate-y-0.5 ${
-                                                    isActive
-                                                        ? "border-blue-300 bg-blue-50 shadow-lg shadow-blue-100"
-                                                        : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/60"
-                                                } ${
-                                                    method.id === "cod" && !isCodAllowed
-                                                        ? "cursor-not-allowed opacity-60"
-                                                        : ""
-                                                }`}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    checked={isActive}
-                                                    disabled={
-                                                        method.id === "cod" && !isCodAllowed
-                                                    }
-                                                    onChange={() => setPayment(method.id)}
-                                                    className="sr-only"
-                                                />
-
-                                                <div className="flex items-start gap-3">
-                                                    <span
-                                                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ring-1 transition ${
-                                                            isActive
-                                                                ? "bg-blue-600 text-white ring-blue-600"
-                                                                : "bg-gray-50 text-blue-600 ring-gray-200 group-hover:ring-blue-200"
-                                                        }`}
-                                                    >
-                                                        <Icon className="h-5 w-5" />
-                                                    </span>
-
-                                                    <div>
-                                                        <p className="font-bold text-gray-950">
-                                                            {method.title}
-                                                        </p>
-                                                        <p className="mt-1 text-sm leading-relaxed text-gray-500">
-                                                            {method.description}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                {isActive && (
-                                                    <BadgeCheck className="absolute right-4 top-4 h-5 w-5 text-blue-600" />
-                                                )}
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-
-                                {payment === "bank_transfer" && (
-                                    <div className="border-t border-blue-100 p-5 sm:p-6">
-                                        <OrderPaymentGuide />
-                                    </div>
-                                )}
-                            </section>
+                            </div>
                         </div>
 
                         <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
@@ -414,7 +527,8 @@ export default function CheckoutPage() {
                                     {cart.items.length === 0 ? (
                                         <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 p-5 text-center text-sm text-slate-500">
                                             Belum ada item checkout. Summary akan
-                                            terisi dari cart customer.
+                                            terisi setelah Anda menambahkan produk
+                                            ke cart.
                                         </div>
                                     ) : (
                                         <>
@@ -481,15 +595,34 @@ export default function CheckoutPage() {
                                     )}
 
                                     <button
-                                        type="submit"
+                                        type={isCartEmpty ? "button" : "submit"}
+                                        onClick={
+                                            isCartEmpty
+                                                ? () => router.push("/cart")
+                                                : undefined
+                                        }
                                         disabled={
                                             isSubmitting ||
-                                            cart.items.length === 0
+                                            (!isCartEmpty && cart.items.length === 0)
                                         }
-                                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className={`flex w-full items-center justify-center gap-2 rounded-lg py-4 font-bold text-white shadow-lg transition hover:-translate-y-0.5 ${
+                                            isCartEmpty
+                                                ? "bg-slate-700 shadow-slate-100 hover:bg-slate-800"
+                                                : "bg-blue-600 shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                        }`}
                                     >
-                                        {isSubmitting ? "Processing..." : "Place Order"}
-                                        <ArrowRight className="h-5 w-5" />
+                                        {isCartEmpty
+                                            ? "Kembali ke Cart"
+                                            : isSubmitting
+                                              ? isPaymentPopupOpening
+                                                  ? "Membuka Popup..."
+                                                  : "Processing..."
+                                              : "Place Order"}
+                                        {isSubmitting ? (
+                                            <LoaderCircle className="h-5 w-5 animate-spin" />
+                                        ) : (
+                                            <ArrowRight className="h-5 w-5" />
+                                        )}
                                     </button>
                                 </div>
                             </div>

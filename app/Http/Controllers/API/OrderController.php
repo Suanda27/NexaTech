@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Concerns\SerializesStoreData;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\Orders\OrderCheckoutService;
+use App\Services\Payments\MidtransPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +16,7 @@ class OrderController extends Controller
 
     public function __construct(
         protected OrderCheckoutService $orderCheckoutService,
+        protected MidtransPaymentService $midtransPaymentService,
     ) {
     }
 
@@ -35,6 +37,11 @@ class OrderController extends Controller
                 'payment_method',
                 'payment_status',
                 'status',
+                'midtrans_order_id',
+                'midtrans_snap_token',
+                'midtrans_redirect_url',
+                'midtrans_transaction_status',
+                'midtrans_payment_type',
                 'payment_rejection_reason',
                 'cancellation_reason',
                 'decline_reason',
@@ -64,6 +71,19 @@ class OrderController extends Controller
         ]);
     }
 
+    public function midtransConfig()
+    {
+        return response()->json([
+            'data' => [
+                'clientKey' => config('services.midtrans.client_key'),
+                'isProduction' => (bool) config('services.midtrans.is_production'),
+                'snapUrl' => (bool) config('services.midtrans.is_production')
+                    ? 'https://app.midtrans.com/snap/snap.js'
+                    : 'https://app.sandbox.midtrans.com/snap/snap.js',
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -72,15 +92,27 @@ class OrderController extends Controller
             'address' => ['required', 'string'],
             'city' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'max:20'],
-            'payment_method' => ['required', 'in:bank_transfer,cod'],
+            'payment_method' => ['required', 'in:bank_transfer,cod,midtrans'],
         ]);
 
         Order::expirePendingTransferPayments();
 
         try {
+            if (
+                $validated['payment_method'] === Order::PAYMENT_METHOD_MIDTRANS
+                && !$this->midtransPaymentService->isConfigured()
+            ) {
+                throw ValidationException::withMessages([
+                    'payment_method' => ['MIDTRANS_SERVER_KEY belum diisi.'],
+                ]);
+            }
+
             $order = $this->orderCheckoutService->createFromCart(
                 $request->user(),
                 $validated,
+                $validated['payment_method'] === Order::PAYMENT_METHOD_MIDTRANS
+                    ? fn (Order $order) => $this->midtransPaymentService->createSnapTransaction($order)
+                    : null,
             );
         } catch (ValidationException $exception) {
             return response()->json([
@@ -122,6 +154,43 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Bukti pembayaran berhasil dikirim untuk diverifikasi admin.',
             'data' => $this->serializeOrder($updatedOrder, false),
+        ]);
+    }
+
+    public function cancelPendingMidtrans(Request $request, Order $order)
+    {
+        try {
+            $cancelledOrder = $this->orderCheckoutService->cancelPendingMidtransOrder(
+                $order,
+                $request->user(),
+            );
+            $this->midtransPaymentService->cancelTransaction($cancelledOrder);
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'message' => collect($exception->errors())->flatten()->first() ?? 'Order tidak bisa dibatalkan.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Pembayaran dibatalkan. Item dikembalikan ke cart.',
+            'data' => $this->serializeOrder($cancelledOrder, false),
+        ]);
+    }
+
+    public function midtransNotification(Request $request)
+    {
+        try {
+            $order = $this->midtransPaymentService->handleNotification($request->all());
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'message' => collect($exception->errors())->flatten()->first() ?? 'Notification Midtrans ditolak.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => $order ? 'Notification Midtrans berhasil diproses.' : 'Order Midtrans tidak ditemukan.',
         ]);
     }
 }

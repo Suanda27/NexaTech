@@ -2,7 +2,7 @@
 
 import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
 
-export type OrderPaymentMethod = "Bank Transfer" | "COD";
+export type OrderPaymentMethod = "Bank Transfer" | "COD" | "Midtrans";
 export type OrderPaymentStatus =
     | "Waiting Payment"
     | "Waiting Verification"

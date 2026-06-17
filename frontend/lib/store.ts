@@ -86,9 +86,13 @@ export type OrderData = {
     paymentDeadline: string | null;
     paymentExpiresAt: string | null;
     paymentMethod: string;
-    paymentMethodKey: "bank_transfer" | "cod";
+    paymentMethodKey: "bank_transfer" | "cod" | "midtrans";
     paymentStatus: string;
     paymentStatusKey: PaymentStatusKey;
+    midtransSnapToken: string | null;
+    midtransRedirectUrl: string | null;
+    midtransTransactionStatus: string | null;
+    midtransPaymentType: string | null;
     status: string;
     statusKey: OrderStatusKey;
     declineReason: string | null;
@@ -121,6 +125,14 @@ export type OrderData = {
         unitPrice: number;
         totalPrice: number;
     }>;
+};
+
+export type MidtransConfigResponse = {
+    data: {
+        clientKey: string | null;
+        isProduction: boolean;
+        snapUrl: string;
+    };
 };
 
 export type ProfileResponse = {
@@ -280,6 +292,10 @@ export function fetchProfile() {
     return fetchJson<ProfileResponse>("/api/profile");
 }
 
+export function fetchMidtransConfig() {
+    return fetchJson<MidtransConfigResponse>("/api/payments/midtrans/config");
+}
+
 export function updateProfile(payload: {
     name: string;
     email: string;
@@ -314,12 +330,21 @@ export function createOrder(payload: {
     address: string;
     city: string;
     postal_code: string;
-    payment_method: "bank_transfer" | "cod";
+    payment_method: "bank_transfer" | "cod" | "midtrans";
 }) {
     return sendJson<{ message: string; data: OrderData }>("/api/orders", {
         method: "POST",
         body: JSON.stringify(payload),
     });
+}
+
+export function cancelPendingMidtransOrder(orderId: string) {
+    return sendJson<{ message: string; data: OrderData }>(
+        `/api/orders/${orderId}/midtrans-cancel`,
+        {
+            method: "POST",
+        },
+    );
 }
 
 export function uploadOrderPaymentProof(
