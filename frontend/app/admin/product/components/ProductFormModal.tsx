@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
     Box,
     ImagePlus,
@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import type { ProductFormValues, ProductItem } from "../types";
 import {
-    createDefaultSpecs,
     createSpec,
     fileToDataUrl,
     formatPrice,
@@ -42,20 +41,7 @@ function buildEmptyForm(categories: string[]): ProductFormValues {
         stock: 0,
         status: "Active",
         imageUrl: null,
-        specs: createDefaultSpecs(),
-    };
-}
-
-function ensureMinimumSpecs(values: ProductFormValues): ProductFormValues {
-    const nextSpecs = [...values.specs];
-
-    while (nextSpecs.length < 4) {
-        nextSpecs.push(createDefaultSpecs()[nextSpecs.length]);
-    }
-
-    return {
-        ...values,
-        specs: nextSpecs,
+        specs: [],
     };
 }
 
@@ -69,6 +55,7 @@ export default function ProductFormModal({
 }: ProductFormModalProps) {
     const [form, setForm] = useState<ProductFormValues>(buildEmptyForm(categories));
     const [isUploading, setIsUploading] = useState(false);
+    const categorySelectId = useId();
 
     const suggestedCategories = useMemo(
         () => categories.filter(Boolean),
@@ -81,20 +68,18 @@ export default function ProductFormModal({
         }
 
         if (initialProduct) {
-            setForm(
-                ensureMinimumSpecs({
-                    name: initialProduct.name,
-                    sku: initialProduct.sku,
-                    category: initialProduct.category,
-                    price: initialProduct.price,
-                    rating: initialProduct.rating,
-                    description: initialProduct.description,
-                    stock: initialProduct.stock,
-                    status: initialProduct.status,
-                    imageUrl: initialProduct.imageUrl,
-                    specs: initialProduct.specs,
-                }),
-            );
+            setForm({
+                name: initialProduct.name,
+                sku: initialProduct.sku,
+                category: initialProduct.category,
+                price: initialProduct.price,
+                rating: initialProduct.rating,
+                description: initialProduct.description,
+                stock: initialProduct.stock,
+                status: initialProduct.status,
+                imageUrl: initialProduct.imageUrl,
+                specs: initialProduct.specs,
+            });
             return;
         }
 
@@ -109,17 +94,12 @@ export default function ProductFormModal({
         (spec) => spec.label.trim() || spec.value.trim() || spec.description.trim(),
     );
 
-    const completedSpecs = form.specs.filter(
-        (spec) => spec.label.trim() && spec.value.trim(),
-    );
-
     const isValid =
         form.name.trim() &&
         form.sku.trim() &&
         form.category.trim() &&
         form.price > 0 &&
-        form.stock >= 0 &&
-        completedSpecs.length >= 1;
+        form.stock >= 0;
 
     const handleClose = () => {
         setForm(buildEmptyForm(categories));
@@ -168,28 +148,10 @@ export default function ProductFormModal({
     };
 
     const handleRemoveSpec = (specId: string) => {
-        setForm((prev) => {
-            if (prev.specs.length <= 4) {
-                return {
-                    ...prev,
-                    specs: prev.specs.map((spec) =>
-                        spec.id === specId
-                            ? {
-                                  ...spec,
-                                  label: "",
-                                  value: "",
-                                  description: "",
-                              }
-                            : spec,
-                    ),
-                };
-            }
-
-            return {
-                ...prev,
-                specs: prev.specs.filter((spec) => spec.id !== specId),
-            };
-        });
+        setForm((prev) => ({
+            ...prev,
+            specs: prev.specs.filter((spec) => spec.id !== specId),
+        }));
     };
 
     const handleSubmit = () => {
@@ -238,6 +200,8 @@ export default function ProductFormModal({
                     <button
                         type="button"
                         onClick={handleClose}
+                        aria-label="Tutup modal produk"
+                        title="Tutup modal produk"
                         className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                     >
                         <X className="h-4 w-4" />
@@ -385,10 +349,14 @@ export default function ProductFormModal({
                             </div>
 
                             <div>
-                                <label className="text-sm font-medium text-slate-700">
+                                <label
+                                    htmlFor={categorySelectId}
+                                    className="text-sm font-medium text-slate-700"
+                                >
                                     Kategori
                                 </label>
                                 <select
+                                    id={categorySelectId}
                                     value={form.category}
                                     onChange={(event) =>
                                         setForm((prev) => ({
@@ -459,11 +427,17 @@ export default function ProductFormModal({
                                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-blue-100 bg-slate-50 px-4 py-3">
                                     {Array.from({ length: 5 }).map((_, index) => {
                                         const value = index + 1;
+                                        const ratingLabel =
+                                            form.rating === value
+                                                ? `Rating ${value} dari 5 dipilih`
+                                                : `Pilih rating ${value} dari 5`;
 
                                         return (
                                             <button
                                                 key={value}
                                                 type="button"
+                                                aria-label={ratingLabel}
+                                                title={ratingLabel}
                                                 onClick={() =>
                                                     setForm((prev) => ({
                                                         ...prev,
@@ -568,164 +542,198 @@ export default function ProductFormModal({
                                 container.
                             </p>
 
-                            <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                                {form.specs.map((spec) => {
-                                    const Icon = getSpecIcon(spec.icon);
-
-                                    return (
-                                        <div
-                                            key={spec.id}
-                                            className="rounded-lg border border-gray-200 bg-gray-50/80 p-4"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100">
-                                                    <Icon className="h-5 w-5" />
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleRemoveSpec(spec.id)
-                                                    }
-                                                    className="rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-red-500"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-
-                                            <div className="mt-4 space-y-3">
-                                                <div>
-                                                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Label
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={spec.label}
-                                                        onChange={(event) =>
-                                                            handleSpecChange(
-                                                                spec.id,
-                                                                "label",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Display"
-                                                        className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Value
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={spec.value}
-                                                        onChange={(event) =>
-                                                            handleSpecChange(
-                                                                spec.id,
-                                                                "value",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="16-inch Retina 120Hz"
-                                                        className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Icon
-                                                    </label>
-                                                    <select
-                                                        value={spec.icon}
-                                                        onChange={(event) =>
-                                                            handleSpecChange(
-                                                                spec.id,
-                                                                "icon",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                        className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                                                    >
-                                                        {specIconOptions.map((option) => (
-                                                            <option
-                                                                key={option.value}
-                                                                value={option.value}
-                                                            >
-                                                                {option.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                                        Deskripsi
-                                                    </label>
-                                                    <textarea
-                                                        rows={4}
-                                                        value={spec.description}
-                                                        onChange={(event) =>
-                                                            handleSpecChange(
-                                                                spec.id,
-                                                                "description",
-                                                                event.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Tambahkan detail singkat untuk spesifikasi ini."
-                                                        className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="mt-5 rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                    <Sparkles className="h-4 w-4 text-blue-600" />
-                                    Preview key specification
-                                </div>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Preview ini mengikuti nuansa tampilan detail
-                                    produk agar hasil akhirnya lebih konsisten.
-                                </p>
-
-                                <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                                    {(previewSpecs.length > 0
-                                        ? previewSpecs
-                                        : form.specs.slice(0, 4)
-                                    ).map((spec) => {
+                            {form.specs.length > 0 ? (
+                                <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                                    {form.specs.map((spec) => {
                                         const Icon = getSpecIcon(spec.icon);
 
                                         return (
                                             <div
-                                                key={`preview-${spec.id}`}
-                                                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                                                key={spec.id}
+                                                className="rounded-lg border border-gray-200 bg-gray-50/80 p-4"
                                             >
-                                                <div className="flex items-start gap-3">
-                                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100">
                                                         <Icon className="h-5 w-5" />
                                                     </span>
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                            {spec.label || "Label"}
-                                                        </p>
-                                                        <p className="mt-1 break-words text-base font-bold leading-7 text-gray-950">
-                                                            {spec.value ||
-                                                                "Isi spesifikasi"}
-                                                        </p>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Hapus spesifikasi ${spec.label || "ini"}`}
+                                                        title={`Hapus spesifikasi ${spec.label || "ini"}`}
+                                                        onClick={() =>
+                                                            handleRemoveSpec(spec.id)
+                                                        }
+                                                        className="rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-red-500"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="mt-4 space-y-3">
+                                                    <div>
+                                                        <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                            Label
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={spec.label}
+                                                            onChange={(event) =>
+                                                                handleSpecChange(
+                                                                    spec.id,
+                                                                    "label",
+                                                                    event.target.value,
+                                                                )
+                                                            }
+                                                            placeholder="Display"
+                                                            className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                            Value
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={spec.value}
+                                                            onChange={(event) =>
+                                                                handleSpecChange(
+                                                                    spec.id,
+                                                                    "value",
+                                                                    event.target.value,
+                                                                )
+                                                            }
+                                                            placeholder="16-inch Retina 120Hz"
+                                                            className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label
+                                                            htmlFor={`spec-icon-${spec.id}`}
+                                                            className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                                                        >
+                                                            Icon
+                                                        </label>
+                                                        <select
+                                                            id={`spec-icon-${spec.id}`}
+                                                            value={spec.icon}
+                                                            onChange={(event) =>
+                                                                handleSpecChange(
+                                                                    spec.id,
+                                                                    "icon",
+                                                                    event.target.value,
+                                                                )
+                                                            }
+                                                            className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                                                        >
+                                                            {specIconOptions.map((option) => (
+                                                                <option
+                                                                    key={option.value}
+                                                                    value={option.value}
+                                                                >
+                                                                    {option.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                                            Deskripsi
+                                                        </label>
+                                                        <textarea
+                                                            rows={4}
+                                                            value={spec.description}
+                                                            onChange={(event) =>
+                                                                handleSpecChange(
+                                                                    spec.id,
+                                                                    "description",
+                                                                    event.target.value,
+                                                                )
+                                                            }
+                                                            placeholder="Tambahkan detail singkat untuk spesifikasi ini."
+                                                            className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                                                        />
                                                     </div>
                                                 </div>
-                                                <p className="mt-3 break-words text-sm leading-7 text-slate-500">
-                                                    {spec.description ||
-                                                        "Tambahkan deskripsi singkat untuk menjelaskan keunggulan spesifikasi ini."}
-                                                </p>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="mt-5 rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-6 text-center">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        Belum ada key specification
+                                    </p>
+                                    <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                                        Produk tetap bisa disimpan tanpa spesifikasi.
+                                        Tambahkan item kalau detail teknis perlu
+                                        ditampilkan di halaman customer.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setForm((prev) => ({
+                                                ...prev,
+                                                specs: [
+                                                    ...prev.specs,
+                                                    createSpec("", "", "display"),
+                                                ],
+                                            }))
+                                        }
+                                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Tambah Spesifikasi
+                                    </button>
+                                </div>
+                            )}
+
+                            {previewSpecs.length > 0 && (
+                                <div className="mt-5 rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                        <Sparkles className="h-4 w-4 text-blue-600" />
+                                        Preview key specification
+                                    </div>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Preview ini mengikuti nuansa tampilan detail
+                                        produk agar hasil akhirnya lebih konsisten.
+                                    </p>
+
+                                    <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                                        {previewSpecs.map((spec) => {
+                                            const Icon = getSpecIcon(spec.icon);
+
+                                            return (
+                                                <div
+                                                    key={`preview-${spec.id}`}
+                                                    className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+                                                            <Icon className="h-5 w-5" />
+                                                        </span>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                                {spec.label || "Label"}
+                                                            </p>
+                                                            <p className="mt-1 break-words text-base font-bold leading-7 text-gray-950">
+                                                                {spec.value ||
+                                                                    "Isi spesifikasi"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="mt-3 break-words text-sm leading-7 text-slate-500">
+                                                        {spec.description ||
+                                                            "Tambahkan deskripsi singkat untuk menjelaskan keunggulan spesifikasi ini."}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </section>
 
                         <section className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">

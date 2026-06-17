@@ -88,6 +88,11 @@ export default function ProductDetailPage() {
         }
     };
 
+    const keySpecifications =
+        product?.specs?.filter(
+            (spec) => spec.label.trim() && spec.value.trim(),
+        ) ?? [];
+
     return (
         <AuthGuard loginPath="/customer/login">
             <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
@@ -206,46 +211,48 @@ export default function ProductDetailPage() {
                                             "Deskripsi produk akan mengikuti isi dari database."}
                                     </p>
 
-                                    <div className="space-y-4">
-                                        <div>
-                                            <p className="text-sm font-semibold text-blue-600">
-                                                Performance Details
-                                            </p>
-                                            <h3 className="text-lg font-bold text-gray-950">
-                                                Key Specifications
-                                            </h3>
-                                        </div>
+                                    {keySpecifications.length > 0 && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="text-sm font-semibold text-blue-600">
+                                                    Performance Details
+                                                </p>
+                                                <h3 className="text-lg font-bold text-gray-950">
+                                                    Key Specifications
+                                                </h3>
+                                            </div>
 
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            {(product.specs ?? []).map((spec) => {
-                                                const Icon = getSpecIcon(spec.icon);
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                {keySpecifications.map((spec) => {
+                                                    const Icon = getSpecIcon(spec.icon);
 
-                                                return (
-                                                    <div
-                                                        key={spec.id}
-                                                        className="group rounded-lg border border-gray-200 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100"
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100 transition group-hover:bg-blue-600 group-hover:text-white">
-                                                                <Icon className="h-5 w-5" />
-                                                            </span>
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                                                    {spec.label}
-                                                                </p>
-                                                                <p className="mt-1 break-words text-sm font-bold text-gray-950">
-                                                                    {spec.value}
-                                                                </p>
-                                                                <p className="mt-2 break-words text-sm leading-6 text-slate-500">
-                                                                    {spec.description}
-                                                                </p>
+                                                    return (
+                                                        <div
+                                                            key={spec.id}
+                                                            className="group rounded-lg border border-gray-200 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md hover:shadow-blue-100"
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100 transition group-hover:bg-blue-600 group-hover:text-white">
+                                                                    <Icon className="h-5 w-5" />
+                                                                </span>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                                        {spec.label}
+                                                                    </p>
+                                                                    <p className="mt-1 break-words text-sm font-bold text-gray-950">
+                                                                        {spec.value}
+                                                                    </p>
+                                                                    <p className="mt-2 break-words text-sm leading-6 text-slate-500">
+                                                                        {spec.description}
+                                                                    </p>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:gap-4">
                                         <button
@@ -262,6 +269,8 @@ export default function ProductDetailPage() {
 
                                         <button
                                             type="button"
+                                            aria-label="Tambahkan produk ke wishlist"
+                                            title="Tambahkan produk ke wishlist"
                                             className="flex items-center justify-center rounded-lg border border-gray-200 bg-white px-6 py-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"
                                         >
                                             <Heart className="h-5 w-5 text-gray-600" />
