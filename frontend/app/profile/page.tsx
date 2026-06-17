@@ -48,6 +48,7 @@ export default function Page() {
     );
     const [profile, setProfile] = useState<ProfileResponse["data"] | null>(null);
     const [orders, setOrders] = useState<OrderData[]>([]);
+    const [hasLoadedOrders, setHasLoadedOrders] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [form, setForm] = useState({
         name: "",
@@ -94,6 +95,8 @@ export default function Page() {
             } else {
                 setOrders([]);
             }
+
+            setHasLoadedOrders(true);
         };
 
         void loadProfile();
@@ -103,15 +106,26 @@ export default function Page() {
         };
     }, []);
 
-    const bankOrders = useMemo(
-        () => orders.filter((order) => order.paymentMethodKey === "bank_transfer"),
+    const orderSummary = useMemo(
+        () => ({
+            totalOrders: orders.length,
+            progressingOrders: orders.filter((order) =>
+                ["pending", "processing"].includes(order.statusKey),
+            ).length,
+            deliveredOrders: orders.filter(
+                (order) => order.statusKey === "delivered",
+            ).length,
+            declinedOrders: orders.filter(
+                (order) => order.paymentStatusKey === "rejected",
+            ).length,
+            cancelledOrders: orders.filter(
+                (order) => order.statusKey === "cancelled",
+            ).length,
+        }),
         [orders],
     );
 
-    const codOrders = useMemo(
-        () => orders.filter((order) => order.paymentMethodKey === "cod"),
-        [orders],
-    );
+    const summary = hasLoadedOrders ? orderSummary : profile?.summary;
 
     const handleSave = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -232,33 +246,28 @@ export default function Page() {
                                 <div className="grid gap-4 md:grid-cols-4">
                                     <SummaryCard
                                         title="Total Orders"
-                                        value={profile?.summary.totalOrders ?? 0}
+                                        value={summary?.totalOrders ?? 0}
                                     />
                                     <SummaryCard
                                         title="Progressing"
-                                        value={profile?.summary.progressingOrders ?? 0}
+                                        value={summary?.progressingOrders ?? 0}
                                     />
                                     <SummaryCard
                                         title="Delivered"
-                                        value={profile?.summary.deliveredOrders ?? 0}
+                                        value={summary?.deliveredOrders ?? 0}
                                     />
                                     <SummaryCard
                                         title="Declined / Cancelled"
                                         value={
-                                            (profile?.summary.declinedOrders ?? 0) +
-                                            (profile?.summary.cancelledOrders ?? 0)
+                                            (summary?.declinedOrders ?? 0) +
+                                            (summary?.cancelledOrders ?? 0)
                                         }
                                     />
                                 </div>
 
                                 <OrderSection
-                                    title="Bank Transfer"
-                                    orders={bankOrders}
-                                    onOrderUpdated={handleOrderUpdated}
-                                />
-                                <OrderSection
-                                    title="Cash on Delivery"
-                                    orders={codOrders}
+                                    title="All Orders"
+                                    orders={orders}
                                     onOrderUpdated={handleOrderUpdated}
                                 />
                             </>
@@ -423,10 +432,10 @@ function OrderSection({
             {orders.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-6 py-12 text-center">
                     <p className="font-semibold text-slate-950">
-                        Belum ada order {title.toLowerCase()}
+                        Belum ada order
                     </p>
                     <p className="mt-2 text-sm text-slate-500">
-                        Histori pesanan customer akan langsung tampil dari backend.
+                        Semua histori checkout dari akun yang sedang login akan tampil di sini.
                     </p>
                 </div>
             ) : (
