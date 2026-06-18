@@ -3,6 +3,7 @@
 import { Zap, Shield, Award, Truck } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Feature = {
     icon: LucideIcon;
@@ -38,18 +39,21 @@ const features: Feature[] = [
 ];
 
 export default function WhyChooseUsSection() {
+    const { t } = useLanguage();
+
     return (
         <section className="bg-white py-14 sm:py-20 lg:py-28">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 {/* Section Heading */}
                 <div className="mx-auto max-w-2xl text-center mb-14 lg:mb-20">
                     <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
-                        Why Choose NexaTech
+                        {t("Why Choose NexaTech")}
                     </h2>
 
                     <p className="mt-4 text-lg text-gray-600">
-                        Experience excellence in every aspect of your technology
-                        journey
+                        {t(
+                            "Experience excellence in every aspect of your technology journey",
+                        )}
                     </p>
                 </div>
 
@@ -81,12 +85,12 @@ export default function WhyChooseUsSection() {
 
                                 {/* Title */}
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    {feature.title}
+                                    {t(feature.title)}
                                 </h3>
 
                                 {/* Description */}
                                 <p className="text-gray-600 leading-relaxed text-sm">
-                                    {feature.description}
+                                    {t(feature.description)}
                                 </p>
                                 <div className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-200/80 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                             </motion.div>

@@ -1,8 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Search } from "lucide-react";
+import LanguageToggle from "../language/LanguageToggle";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function HeaderGuest() {
+    const { t } = useLanguage();
+
     return (
         <header className="w-full border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
             {/* Outer full width */}
@@ -18,9 +24,9 @@ export default function HeaderGuest() {
                             <Image
                                 src="/logoNexaTech.png"
                                 alt="NexaTech Logo"
-                                width={100}
-                                height={100}
-                                className="relative h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                                width={157}
+                                height={40}
+                                className="relative h-8 w-auto object-contain transition-transform duration-300 group-hover:scale-105 sm:h-10"
                                 priority
                             />
                         </div>
@@ -36,7 +42,7 @@ export default function HeaderGuest() {
 
                             <input
                                 type="text"
-                                placeholder="Search products..."
+                                placeholder={t("Search products...")}
                                 className="w-full rounded-full border bg-gray-100 py-2 pl-10 pr-4 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
@@ -46,17 +52,18 @@ export default function HeaderGuest() {
                     <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                         <Link
                             href="/customer/login"
-                            className="rounded-lg border border-blue-500 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50 sm:px-4"
+                            className="rounded-lg border border-blue-500 px-2.5 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50 sm:px-4"
                         >
-                            Login
+                            {t("Login")}
                         </Link>
 
                         <Link
                             href="/customer/register"
-                            className="rounded-lg bg-blue-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-600 sm:px-4"
+                            className="rounded-lg bg-blue-500 px-2.5 py-2 text-sm font-medium text-white transition hover:bg-blue-600 sm:px-4"
                         >
-                            Register
+                            {t("Register")}
                         </Link>
+                        <LanguageToggle />
                     </div>
                 </div>
             </div>
@@ -71,7 +78,7 @@ export default function HeaderGuest() {
 
                     <input
                         type="text"
-                        placeholder="Search products..."
+                        placeholder={t("Search products...")}
                         className="w-full rounded-full border bg-gray-100 py-2 pl-10 pr-4 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
                     />
                 </div>

@@ -6,11 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { apiUrl, resolveAdminRedirect } from "@/lib/auth";
+import { useLanguage } from "@/context/LanguageContext";
+import LanguageToggle from "@/app/components/language/LanguageToggle";
 
 export default function AdminLoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, isLoading, login } = useAuth();
+    const { t } = useLanguage();
 
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +62,7 @@ export default function AdminLoginPage() {
                 alert(
                     data.message ||
                         data.errors?.email?.[0] ||
-                        "Login admin gagal",
+                        t("Admin login failed"),
                 );
                 return;
             }
@@ -68,31 +71,34 @@ export default function AdminLoginPage() {
             router.replace(resolveAdminRedirect(searchParams.get("redirect")));
         } catch (error) {
             console.error(error);
-            alert("Terjadi kesalahan koneksi");
+            alert(t("Connection error occurred"));
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_36%,#f8fafc_100%)] px-4 py-10">
+        <main className="relative flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_36%,#f8fafc_100%)] px-4 py-10">
+            <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+                <LanguageToggle />
+            </div>
             <div className="w-full max-w-md rounded-[28px] border border-blue-100 bg-white p-7 shadow-2xl shadow-blue-100/80 sm:p-9">
                 <div className="mb-8 text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg shadow-blue-200">
                         <Shield className="h-8 w-8" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-950">
-                        Admin Sign In
+                        {t("Admin Sign In")}
                     </h1>
                     <p className="mt-2 text-sm text-slate-500">
-                        Masuk ke dashboard pengelolaan NexaTech.
+                        {t("Sign in to the NexaTech management dashboard.")}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-700">
-                            Email
+                            {t("Email")}
                         </label>
                         <div className="relative">
                             <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
@@ -110,7 +116,7 @@ export default function AdminLoginPage() {
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-700">
-                            Password
+                            {t("Password")}
                         </label>
                         <div className="relative">
                             <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-500" />
@@ -119,7 +125,7 @@ export default function AdminLoginPage() {
                                 name="password"
                                 value={formData.password}
                                 onChange={handleChange}
-                                placeholder="Enter your password"
+                                placeholder={t("Enter your password")}
                                 required
                                 className="w-full rounded-2xl border border-blue-100 bg-slate-50 py-3.5 pl-12 pr-12 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                             />
@@ -142,17 +148,17 @@ export default function AdminLoginPage() {
                         disabled={isSubmitting}
                         className="w-full rounded-2xl bg-blue-600 py-4 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                        {isSubmitting ? "Signing in..." : "Login Admin"}
+                        {isSubmitting ? t("Signing in...") : t("Login Admin")}
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-slate-500">
-                    Kembali ke{" "}
+                    {t("Back to")}{" "}
                     <Link
                         href="/"
                         className="font-semibold text-blue-600 transition hover:text-blue-700"
                     >
-                        halaman utama
+                        {t("main page")}
                     </Link>
                 </div>
             </div>

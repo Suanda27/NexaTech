@@ -4,8 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function HeroSection() {
+    const { t } = useLanguage();
+
     return (
         <section className="relative overflow-hidden bg-gradient-to-b from-white to-blue-50/30">
             {/* Background glow */}
@@ -61,7 +64,7 @@ export default function HeroSection() {
                                 transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
                                 className="inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-100/60"
                             >
-                                Premium Tech Collection
+                                {t("Premium Tech Collection")}
                             </motion.div>
 
                             <motion.h1
@@ -72,9 +75,9 @@ export default function HeroSection() {
                                 transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
                                 className="text-4xl font-bold tracking-tight text-gray-950 sm:text-5xl lg:text-6xl xl:text-7xl"
                             >
-                                Upgrade Your Tech
+                                {t("Upgrade Your Tech")}{" "}
                                 <span className="block mt-2 bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                                    Experience
+                                    {t("Experience")}
                                 </span>
                             </motion.h1>
 
@@ -86,9 +89,9 @@ export default function HeroSection() {
                                 transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
                                 className="max-w-xl text-lg text-gray-600 sm:text-xl"
                             >
-                                Discover premium technology products designed to
-                                enhance your digital lifestyle. Quality,
-                                performance, and innovation in every device.
+                                {t(
+                                    "Discover premium technology products designed to enhance your digital lifestyle. Quality, performance, and innovation in every device.",
+                                )}
                             </motion.p>
                         </div>
 
@@ -105,7 +108,7 @@ export default function HeroSection() {
                                 href="/product"
                                 className="group inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-4 font-bold text-white shadow-lg shadow-blue-100 transition-all duration-300 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200"
                             >
-                                Shop Now
+                                {t("Shop Now")}
                                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                             </Link>
 
@@ -113,7 +116,7 @@ export default function HeroSection() {
                                 href="/product"
                                 className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-8 py-4 font-bold text-gray-900 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                             >
-                                Explore Products
+                                {t("Explore Products")}
                             </Link>
                         </motion.div>
                     </motion.div>
@@ -139,7 +142,7 @@ export default function HeroSection() {
                         >
                             <Image
                                 src="https://images.unsplash.com/photo-1641430034785-47f6f91ab6cf"
-                                alt="Modern tech workspace"
+                                alt={t("Modern tech workspace")}
                                 width={1080}
                                 height={720}
                                 priority
@@ -162,7 +165,7 @@ export default function HeroSection() {
                                         }}
                                         className="rounded-lg border border-blue-100 bg-white px-3 py-3 text-center text-xs font-bold text-blue-700 shadow-sm"
                                     >
-                                        {item}
+                                        {t(item)}
                                     </motion.div>
                                 ),
                             )}

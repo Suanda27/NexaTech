@@ -12,6 +12,8 @@ import {
     X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import LanguageToggle from "@/app/components/language/LanguageToggle";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface HeaderProps {
     mobileOpen: boolean;
@@ -23,13 +25,14 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
     const menuRef = useRef<HTMLDivElement | null>(null);
     const router = useRouter();
     const { user, logout } = useAuth();
+    const { t } = useLanguage();
 
     const adminInfo = useMemo(
         () => ({
             name: user?.name ?? "Administrator",
-            role: user?.role === "admin" ? "Administrator" : "Staff",
+            role: user?.role === "admin" ? t("Administrator") : t("Staff"),
         }),
-        [user],
+        [user, t],
     );
 
     const handleLogout = async () => {
@@ -63,7 +66,7 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                     <button
                         className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600 transition hover:bg-blue-100 lg:hidden"
                         onClick={onToggle}
-                        aria-label="Toggle sidebar"
+                        aria-label={t("Toggle sidebar")}
                     >
                         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
@@ -77,7 +80,7 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                         />
                         <input
                             type="text"
-                            placeholder="Search admin panel..."
+                            placeholder={t("Search admin panel...")}
                             className="w-full rounded-lg border border-blue-100 bg-slate-50 py-2.5 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         />
                     </div>
@@ -87,6 +90,9 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                     className="relative ml-auto flex shrink-0 items-center gap-2 sm:gap-3"
                     ref={menuRef}
                 >
+                    <div className="hidden sm:block">
+                        <LanguageToggle />
+                    </div>
                     <div className="hidden min-w-0 sm:flex flex-col text-right">
                         <span className="text-sm font-semibold text-slate-900">
                             {adminInfo.name}
@@ -115,13 +121,16 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                                 className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm text-red-600 transition hover:bg-red-50"
                             >
                                 <LogOut className="h-4 w-4" />
-                                Logout
+                                {t("Logout")}
                             </button>
                         </div>
                     )}
                 </div>
             </div>
             <div className="border-t border-blue-50 px-4 py-3 lg:hidden">
+                <div className="mb-3 sm:hidden">
+                    <LanguageToggle />
+                </div>
                 <div className="relative">
                     <Search
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400"
@@ -129,7 +138,7 @@ export default function Header({ mobileOpen, onToggle }: HeaderProps) {
                     />
                     <input
                         type="text"
-                        placeholder="Search admin panel..."
+                        placeholder={t("Search admin panel...")}
                         className="w-full rounded-lg border border-blue-100 bg-slate-50 py-2.5 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                     />
                 </div>

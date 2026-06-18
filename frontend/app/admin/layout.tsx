@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import AuthGuard from "@/app/components/auth/AuthGuard";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
+import AdminLanguageSync from "./components/AdminLanguageSync";
 
 export default function AdminLayout({
     children,
@@ -20,20 +21,24 @@ export default function AdminLayout({
 
     return (
         <AuthGuard requiredRole="admin" loginPath="/admin/login">
-            <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] lg:h-screen lg:overflow-hidden lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
-                <Sidebar
-                    isOpen={sidebarOpen}
-                    onToggle={() => setSidebarOpen((prev) => !prev)}
-                />
-
-                <div className="min-h-screen min-w-0 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
-                    <Header
-                        mobileOpen={sidebarOpen}
+            <AdminLanguageSync>
+                <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] lg:h-screen lg:overflow-hidden lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+                    <Sidebar
+                        isOpen={sidebarOpen}
                         onToggle={() => setSidebarOpen((prev) => !prev)}
                     />
-                    <main className="flex-1 lg:overflow-y-auto">{children}</main>
+
+                    <div className="min-h-screen min-w-0 lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
+                        <Header
+                            mobileOpen={sidebarOpen}
+                            onToggle={() => setSidebarOpen((prev) => !prev)}
+                        />
+                        <main className="flex-1 lg:overflow-y-auto">
+                            {children}
+                        </main>
+                    </div>
                 </div>
-            </div>
+            </AdminLanguageSync>
         </AuthGuard>
     );
 }

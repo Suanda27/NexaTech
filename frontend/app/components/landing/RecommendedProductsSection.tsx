@@ -11,9 +11,11 @@ import {
     fetchPublicRecommendations,
     type ApiProduct,
 } from "@/lib/store";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function RecommendedProductsSection() {
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [products, setProducts] = useState<ApiProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -63,7 +65,7 @@ export default function RecommendedProductsSection() {
                     <div>
                         <div className="mb-4 inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-blue-100">
                             <Sparkles className="h-4 w-4" />
-                            Recommended For You
+                            {t("Recommended For You")}
                         </div>
                         <h2 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
                             Rekomendasi yang mengikuti cara belanjamu.
@@ -82,7 +84,9 @@ export default function RecommendedProductsSection() {
                             </span>
                             <div>
                                 <p className="font-bold text-gray-950">
-                                    {user ? "Personalized picks" : "Random picks"}
+                                    {user
+                                        ? t("Personalized picks")
+                                        : t("Random picks")}
                                 </p>
                                 <p className="mt-1 text-sm leading-relaxed text-gray-600">
                                     {user
@@ -136,6 +140,8 @@ function ProductCard({
     product: ApiProduct;
     index: number;
 }) {
+    const { t } = useLanguage();
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 30, scale: 0.98 }}
@@ -161,7 +167,7 @@ function ProductCard({
                         />
                     ) : (
                         <div className="flex h-full w-full items-center justify-center rounded-lg bg-white text-sm font-semibold text-blue-600">
-                            No Image
+                            {t("No Image")}
                         </div>
                     )}
                     <span className="absolute left-5 top-5 rounded-lg bg-white/90 px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm ring-1 ring-blue-100 backdrop-blur">

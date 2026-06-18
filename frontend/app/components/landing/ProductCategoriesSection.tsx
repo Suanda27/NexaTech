@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { fetchCatalogCategories, type ApiCategory } from "@/lib/store";
+import { useLanguage } from "@/context/LanguageContext";
 
 const categoryImageFallbacks: Record<string, string> = {
     laptop: "/images/categories/laptops.jpg",
@@ -55,6 +56,7 @@ function resolveCategoryHref(category: ApiCategory): string {
 }
 
 export default function ProductCategoriesSection() {
+    const { t } = useLanguage();
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -91,7 +93,7 @@ export default function ProductCategoriesSection() {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="mx-auto mb-14 max-w-2xl text-center lg:mb-20">
                     <h2 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
-                        Browse Categories
+                        {t("Browse Categories")}
                     </h2>
 
                     <p className="mt-4 text-lg text-gray-600">
@@ -172,7 +174,7 @@ export default function ProductCategoriesSection() {
                                                 </h3>
 
                                                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/90">
-                                                    Lihat produk
+                                                    {t("View Products")}
                                                     <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                                                 </span>
                                             </div>

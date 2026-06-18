@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
+import LanguageToggle from "../language/LanguageToggle";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function HeaderUser() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -20,6 +22,7 @@ export default function HeaderUser() {
     const router = useRouter();
     const { user, logout } = useAuth();
     const { cartCount, setCartCount } = useShop();
+    const { t } = useLanguage();
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -52,9 +55,9 @@ export default function HeaderUser() {
                     <Image
                         src="/logoNexaTech.png"
                         alt="NexaTech Logo"
-                        width={120}
-                        height={48}
-                        className="h-10 w-auto object-contain"
+                        width={157}
+                        height={40}
+                        className="h-8 w-auto object-contain sm:h-10"
                         priority
                     />
                 </Link>
@@ -69,7 +72,7 @@ export default function HeaderUser() {
 
                         <input
                             type="text"
-                            placeholder="Search products..."
+                            placeholder={t("Search products...")}
                             className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
@@ -82,7 +85,7 @@ export default function HeaderUser() {
                         href="/product"
                         className="hidden text-gray-700 font-medium hover:text-black md:block"
                     >
-                        Products
+                        {t("Products")}
                     </Link>
 
                     {/* Cart */}
@@ -111,7 +114,7 @@ export default function HeaderUser() {
                                     {user?.name ?? "Account"}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                    {user?.email ?? "Signed in"}
+                                    {user?.email ?? t("Signed in")}
                                 </p>
                             </div>
                             <ChevronDown size={16} />
@@ -124,14 +127,14 @@ export default function HeaderUser() {
                                     className="block rounded-xl px-4 py-3 text-sm text-gray-700 transition hover:bg-blue-50 hover:text-blue-700"
                                     onClick={() => setMenuOpen(false)}
                                 >
-                                    Order History
+                                    {t("Order History")}
                                 </Link>
                                 <Link
                                     href="/profile?tab=personal"
                                     className="block rounded-xl px-4 py-3 text-sm text-gray-700 transition hover:bg-blue-50 hover:text-blue-700"
                                     onClick={() => setMenuOpen(false)}
                                 >
-                                    Personal Info
+                                    {t("Personal Info")}
                                 </Link>
                                 <button
                                     type="button"
@@ -139,11 +142,13 @@ export default function HeaderUser() {
                                     className="mt-1 flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm text-red-600 transition hover:bg-red-50"
                                 >
                                     <LogOut className="h-4 w-4" />
-                                    Logout
+                                    {t("Logout")}
                                 </button>
                             </div>
                         )}
                     </div>
+
+                    <LanguageToggle />
                 </div>
             </div>
 
@@ -157,7 +162,7 @@ export default function HeaderUser() {
 
                     <input
                         type="text"
-                        placeholder="Search products..."
+                        placeholder={t("Search products...")}
                         className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>

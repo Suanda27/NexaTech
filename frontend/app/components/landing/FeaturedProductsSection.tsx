@@ -5,8 +5,10 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { fetchFeaturedProducts, type ApiProduct } from "@/lib/store";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FeaturedProductsSection() {
+    const { t } = useLanguage();
     const [products, setProducts] = useState<ApiProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -44,10 +46,10 @@ export default function FeaturedProductsSection() {
                 <div className="mb-10 flex flex-col gap-4 rounded-lg border border-blue-100 bg-blue-50/60 p-5 shadow-sm shadow-blue-100/50 sm:p-6 lg:mb-14 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-2xl">
                         <p className="text-sm font-semibold text-blue-600">
-                            Featured Products
+                            {t("Featured Products")}
                         </p>
                         <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
-                            Fresh product visuals from the live catalog.
+                            {t("Fresh product visuals from the live catalog.")}
                         </h2>
                         <p className="mt-4 text-base leading-relaxed text-gray-600 sm:text-lg">
                             Section ini sekarang mengikuti data produk dari
@@ -60,7 +62,7 @@ export default function FeaturedProductsSection() {
                         href="/product"
                         className="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200"
                     >
-                        View All Products
+                        {t("View All Products")}
                         <ArrowRight className="h-4 w-4" />
                     </Link>
                 </div>
@@ -111,7 +113,7 @@ export default function FeaturedProductsSection() {
                                             />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-blue-600">
-                                                No Image
+                                                {t("No Image")}
                                             </div>
                                         )}
                                         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(59,130,246,0)_0%,rgba(59,130,246,0.14)_100%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
