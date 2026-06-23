@@ -25,9 +25,12 @@ return new class extends Migration
             }
         });
 
-        $transferOrders = DB::table('orders')
-            ->where('payment_method', Order::PAYMENT_METHOD_BANK_TRANSFER)
-            ->where('payment_status', Order::PAYMENT_STATUS_UNPAID)
+        /** @var \Illuminate\Database\Query\Builder $ordersTable */
+        $ordersTable = DB::table('orders');
+
+        $transferOrders = $ordersTable
+            ->where('payment_method', 'bank_transfer')
+            ->where('payment_status', 'unpaid')
             ->select('id', 'ordered_at', 'created_at', 'expires_at')
             ->get();
 
@@ -38,38 +41,25 @@ return new class extends Migration
                 ->where('id', $order->id)
                 ->update([
                     'payment_status' => Order::PAYMENT_STATUS_WAITING_PAYMENT,
-                    'status' => Order::STATUS_PENDING,
+                    'status' => Order::STATUS_WAITING_PAYMENT,
                     'expires_at' => $order->expires_at
                         ? Carbon::parse($order->expires_at)
                         : Carbon::parse($baseTime)->addHours(Order::TRANSFER_PAYMENT_WINDOW_HOURS),
                 ]);
         }
 
-        DB::table('orders')
-            ->where('payment_method', Order::PAYMENT_METHOD_COD)
+        /** @var \Illuminate\Database\Query\Builder $ordersTable */
+        $ordersTable = DB::table('orders');
+        $ordersTable
+            ->where('payment_method', 'cod')
             ->where('status', 'progressing')
             ->update([
                 'status' => Order::STATUS_PROCESSING,
             ]);
 
-        $paidOrders = DB::table('orders')
-            ->where('payment_status', Order::PAYMENT_STATUS_PAID)
-            ->where('status', 'progressing')
-            ->select('id', 'ordered_at', 'created_at', 'payment_verified_at')
-            ->get();
-
-        foreach ($paidOrders as $order) {
-            DB::table('orders')
-                ->where('id', $order->id)
-                ->update([
-                    'status' => Order::STATUS_PROCESSING,
-                    'payment_verified_at' => $order->payment_verified_at
-                        ? Carbon::parse($order->payment_verified_at)
-                        : Carbon::parse($order->ordered_at ?? $order->created_at ?? now()),
-                ]);
-        }
-
-        $declinedOrders = DB::table('orders')
+        /** @var \Illuminate\Database\Query\Builder $ordersTable */
+        $ordersTable = DB::table('orders');
+        $declinedOrders = $ordersTable
             ->where('status', 'declined')
             ->select('id', 'ordered_at', 'created_at', 'payment_submitted_at')
             ->get();
@@ -78,8 +68,9 @@ return new class extends Migration
             DB::table('orders')
                 ->where('id', $order->id)
                 ->update([
-                    'status' => Order::STATUS_PENDING,
-                    'payment_status' => Order::PAYMENT_STATUS_REJECTED,
+                    'status' => Order::STATUS_CANCELLED,
+                    'payment_status' => Order::PAYMENT_STATUS_CANCELLED,
+                    'cancelled_at' => Carbon::parse($order->ordered_at ?? $order->created_at ?? now()),
                     'payment_submitted_at' => $order->payment_submitted_at
                         ? Carbon::parse($order->payment_submitted_at)
                         : Carbon::parse($order->ordered_at ?? $order->created_at ?? now()),

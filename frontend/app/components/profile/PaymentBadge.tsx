@@ -1,11 +1,11 @@
-export default function PaymentBadge({ isPaid }: any) {
+export default function PaymentBadge({ isProcessing }: { isProcessing: boolean }) {
     return (
         <span
             className={`px-2 py-1 text-sm rounded ${
-                isPaid ? "bg-green-100 text-green-700" : "bg-gray-200"
+                isProcessing ? "bg-green-100 text-green-700" : "bg-gray-200"
             }`}
         >
-            {isPaid ? "Paid" : "Unpaid"}
+            {isProcessing ? "Processing" : "Waiting Payment"}
         </span>
     );
 }

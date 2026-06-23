@@ -13,22 +13,24 @@ import StatsCard from "./components/StatsCard";
 import SalesChart from "./components/SalesChart";
 import ProductTable from "./components/ProductTable";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { fetchAdminDashboard, type AdminDashboardResponse } from "@/lib/store";
 
 export default function DashboardPage() {
     const { user } = useAuth();
+    const { language, t } = useLanguage();
     const [dashboard, setDashboard] =
         useState<AdminDashboardResponse["data"] | null>(null);
 
     const todayLabel = useMemo(
         () =>
-            new Intl.DateTimeFormat("en-US", {
+            new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
                 year: "numeric",
             }).format(new Date()),
-        [],
+        [language],
     );
 
     useEffect(() => {
@@ -72,7 +74,7 @@ export default function DashboardPage() {
                         <div className="space-y-5">
                             <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
                                 <Sparkles className="h-3.5 w-3.5" />
-                                Live admin overview
+                                {t("Live admin overview")}
                             </div>
 
                             <div className="space-y-3">
@@ -81,13 +83,11 @@ export default function DashboardPage() {
                                         {todayLabel}
                                     </p>
                                     <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                        Welcome back, {user?.name ?? "Admin"}.
+                                        {t("Welcome back,")} {user?.name ?? "Admin"}.
                                     </h1>
                                 </div>
                                 <p className="max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                                    Monitor store performance, track growth,
-                                    and keep your best-selling products in
-                                    focus from one calm dashboard.
+                                    {t("Monitor store performance, track growth, and keep your best-selling products in focus from one calm dashboard.")}
                                 </p>
                             </div>
                         </div>
@@ -97,7 +97,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                        Conversion
+                                        {t("Conversion")}
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
                                             {dashboard?.stats.totalOrders
@@ -114,13 +114,13 @@ export default function DashboardPage() {
                                 </div>
                                 <p className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
                                     <ArrowUpRight className="h-3.5 w-3.5" />
-                                    Live sync from orders
+                                    {t("Live sync from orders")}
                                 </p>
                             </div>
 
                             <div className="rounded-lg border border-blue-100 bg-slate-950 p-4 text-white shadow-[0_24px_50px_-34px_rgba(15,23,42,0.9)]">
                                 <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
-                                    Fulfillment
+                                    {t("Fulfillment")}
                                 </p>
                                 <div className="mt-3 flex items-end justify-between gap-4">
                                     <div>
@@ -128,7 +128,7 @@ export default function DashboardPage() {
                                             {(dashboard?.stats.fulfillmentRate ?? 0).toFixed(1)}%
                                         </p>
                                         <p className="mt-1 text-xs text-slate-300">
-                                            Orders processed on time
+                                            {t("Orders processed on time")}
                                         </p>
                                     </div>
                                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-blue-200">
@@ -142,21 +142,21 @@ export default function DashboardPage() {
 
                 <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <StatsCard
-                        title="Total Penjualan"
+                        title={t("Total Sales")}
                         value={`Rp ${(dashboard?.stats.totalRevenue ?? 0).toLocaleString("id-ID")}`}
-                        note="from delivered orders"
+                        note={t("from completed orders")}
                         icon={ChartNoAxesCombined}
                     />
                     <StatsCard
-                        title="Total Order"
+                        title={t("Total Orders")}
                         value={(dashboard?.stats.totalOrders ?? 0).toLocaleString("id-ID")}
-                        note="current backend total"
+                        note={t("current backend total")}
                         icon={ClipboardList}
                     />
                     <StatsCard
-                        title="Total Produk"
+                        title={t("Total Products")}
                         value={(dashboard?.stats.totalProducts ?? 0).toLocaleString("id-ID")}
-                        note="active catalog source"
+                        note={t("active catalog source")}
                         icon={Boxes}
                     />
                 </section>
@@ -166,15 +166,14 @@ export default function DashboardPage() {
                         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                             <div>
                                 <p className="text-sm font-medium text-blue-700">
-                                    Store Performance
+                                    {t("Store Performance")}
                                 </p>
                                 <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-                                    Sales Overview
+                                    {t("Sales Overview")}
                                 </h2>
                             </div>
                             <p className="max-w-sm text-sm leading-6 text-slate-500">
-                                Revenue and order movement across the last six
-                                months.
+                                {t("Revenue and order movement across the last six months.")}
                             </p>
                         </div>
                         <SalesChart
@@ -188,14 +187,14 @@ export default function DashboardPage() {
                         <div className="mb-5 flex items-end justify-between gap-4">
                             <div>
                                 <p className="text-sm font-medium text-blue-700">
-                                    Best Sellers
+                                    {t("Best Sellers")}
                                 </p>
                                 <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-                                    Top Products
+                                    {t("Top Products")}
                                 </h2>
                             </div>
                             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                                Updated today
+                                {t("Updated today")}
                             </span>
                         </div>
                         <ProductTable products={dashboard?.topProducts ?? []} />

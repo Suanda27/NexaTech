@@ -4,8 +4,10 @@ namespace App\Services\Payments;
 
 use App\Models\Order;
 use App\Models\Product;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -91,21 +93,87 @@ class MidtransPaymentService
     public function handleNotification(array $payload): ?Order
     {
         if (!$this->isValidSignature($payload)) {
+            Log::warning('Midtrans notification rejected: invalid signature.', [
+                'order_id' => $payload['order_id'] ?? null,
+                'transaction_status' => $payload['transaction_status'] ?? null,
+                'status_code' => $payload['status_code'] ?? null,
+            ]);
+
             throw ValidationException::withMessages([
                 'signature_key' => ['Signature Midtrans tidak valid.'],
             ]);
         }
 
-        $order = Order::query()
-            ->where('midtrans_order_id', $payload['order_id'] ?? null)
+        $order = Order::where('midtrans_order_id', $payload['order_id'] ?? null)
             ->with('items')
             ->first();
 
         if (!$order) {
+            Log::warning('Midtrans notification ignored: order not found.', [
+                'order_id' => $payload['order_id'] ?? null,
+                'transaction_status' => $payload['transaction_status'] ?? null,
+            ]);
+
             return null;
         }
 
+        return $this->applyStatusPayload($order, $payload);
+    }
+
+    public function syncTransactionStatus(Order $order): Order
+    {
+        if (blank($order->midtrans_order_id)) {
+            throw ValidationException::withMessages([
+                'order' => ['Order belum memiliki transaksi Midtrans.'],
+            ]);
+        }
+
+        try {
+            $response = Http::withBasicAuth($this->serverKey(), '')
+                ->withOptions($this->httpOptions())
+                ->acceptJson()
+                ->get($this->transactionStatusEndpoint($order->midtrans_order_id));
+        } catch (ConnectionException) {
+            throw ValidationException::withMessages([
+                'midtrans' => ['Tidak bisa terhubung ke Midtrans untuk sinkron status.'],
+            ]);
+        }
+
+        if ($response->failed()) {
+            $message = collect($response->json('error_messages') ?? [])
+                ->filter()
+                ->first();
+
+            throw ValidationException::withMessages([
+                'midtrans' => [
+                    $message
+                        ? "Gagal sinkron status Midtrans: {$message}"
+                        : 'Gagal sinkron status Midtrans.',
+                ],
+            ]);
+        }
+
+        $payload = $response->json();
+
+        if (($payload['order_id'] ?? null) !== $order->midtrans_order_id) {
+            throw ValidationException::withMessages([
+                'midtrans' => ['Respons Midtrans tidak cocok dengan order ini.'],
+            ]);
+        }
+
+        return $this->applyStatusPayload($order, $payload);
+    }
+
+    protected function applyStatusPayload(Order $order, array $payload): Order
+    {
         return DB::transaction(function () use ($order, $payload): Order {
+            /** @var Order $order */
+            $order = Order::query()
+                ->whereKey($order->id)
+                ->with('items')
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $transactionStatus = $payload['transaction_status'] ?? null;
             $fraudStatus = $payload['fraud_status'] ?? null;
 
@@ -114,24 +182,35 @@ class MidtransPaymentService
                 'midtrans_payment_type' => $payload['payment_type'] ?? $order->midtrans_payment_type,
             ];
 
-            if (
-                $order->status === Order::STATUS_CANCELLED
-                && $order->payment_status === Order::PAYMENT_STATUS_EXPIRED
-            ) {
+            if ($order->status !== Order::STATUS_WAITING_PAYMENT) {
                 $order->forceFill($updates)->save();
+
+                Log::info('Midtrans notification stored without changing final order status.', [
+                    'order_id' => $order->id,
+                    'midtrans_order_id' => $order->midtrans_order_id,
+                    'order_status' => $order->status,
+                    'transaction_status' => $transactionStatus,
+                ]);
 
                 return $order->fresh()->load('items');
             }
 
-            if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
-                $updates['payment_status'] = Order::PAYMENT_STATUS_PAID;
+            if ($transactionStatus === 'pending') {
+                $updates['payment_status'] = Order::PAYMENT_STATUS_WAITING_PAYMENT;
+                $updates['status'] = Order::STATUS_WAITING_PAYMENT;
+            }
+
+            if ($transactionStatus === 'settlement' || $transactionStatus === 'capture') {
+                $updates['payment_status'] = Order::PAYMENT_STATUS_PROCESSING;
                 $updates['status'] = Order::STATUS_PROCESSING;
                 $updates['payment_verified_at'] = now();
+                $updates['cancellation_reason'] = null;
+                $updates['decline_reason'] = null;
             }
 
             if (in_array($transactionStatus, ['expire', 'cancel', 'deny', 'failure'], true)) {
                 $this->releaseStockForFailedPayment($order);
-                $updates['payment_status'] = Order::PAYMENT_STATUS_EXPIRED;
+                $updates['payment_status'] = Order::PAYMENT_STATUS_CANCELLED;
                 $updates['status'] = Order::STATUS_CANCELLED;
                 $updates['cancelled_at'] = now();
                 $updates['cancellation_reason'] = 'Pembayaran Midtrans tidak selesai.';
@@ -139,6 +218,14 @@ class MidtransPaymentService
             }
 
             $order->forceFill($updates)->save();
+
+            Log::info('Midtrans notification processed.', [
+                'order_id' => $order->id,
+                'midtrans_order_id' => $order->midtrans_order_id,
+                'transaction_status' => $transactionStatus,
+                'payment_status' => $updates['payment_status'] ?? $order->payment_status,
+                'status' => $updates['status'] ?? $order->status,
+            ]);
 
             return $order->fresh()->load('items');
         });
@@ -180,7 +267,7 @@ class MidtransPaymentService
         ];
 
         if ((bool) config('services.midtrans.mock_auto_settle')) {
-            $updates['payment_status'] = Order::PAYMENT_STATUS_PAID;
+            $updates['payment_status'] = Order::PAYMENT_STATUS_PROCESSING;
             $updates['status'] = Order::STATUS_PROCESSING;
             $updates['payment_verified_at'] = now();
             $updates['midtrans_transaction_status'] = 'settlement';
@@ -236,6 +323,15 @@ class MidtransPaymentService
             : "https://api.sandbox.midtrans.com/v2/{$encodedOrderId}/cancel";
     }
 
+    protected function transactionStatusEndpoint(string $midtransOrderId): string
+    {
+        $encodedOrderId = rawurlencode($midtransOrderId);
+
+        return $this->isProduction()
+            ? "https://api.midtrans.com/v2/{$encodedOrderId}/status"
+            : "https://api.sandbox.midtrans.com/v2/{$encodedOrderId}/status";
+    }
+
     protected function serverKey(): string
     {
         $serverKey = config('services.midtrans.server_key');
@@ -251,15 +347,6 @@ class MidtransPaymentService
 
     protected function guardEnvironmentKeyMatch(string $serverKey): void
     {
-        $isSandboxKey = Str::startsWith($serverKey, 'SB-Mid-server-')
-            || Str::startsWith($serverKey, 'Mid-server-');
-
-        if (!$this->isProduction() && !$isSandboxKey) {
-            throw ValidationException::withMessages([
-                'payment_method' => ['Mode Midtrans masih sandbox, tetapi Server Key yang dipakai bukan sandbox. Gunakan key sandbox yang valid atau ubah MIDTRANS_IS_PRODUCTION=true.'],
-            ]);
-        }
-
         if ($this->isProduction() && Str::startsWith($serverKey, 'SB-Mid-server-')) {
             throw ValidationException::withMessages([
                 'payment_method' => ['Mode Midtrans production aktif, tetapi Server Key yang dipakai masih sandbox. Gunakan production key atau ubah MIDTRANS_IS_PRODUCTION=false.'],
@@ -312,6 +399,7 @@ class MidtransPaymentService
             return;
         }
 
+        /** @var \Illuminate\Support\Collection<int, int> $productIds */
         $productIds = $order->items
             ->pluck('product_id')
             ->filter()

@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import { translateText } from "@/lib/translations";
+import { translateText, type Language } from "@/lib/translations";
 
 const translatedAttributes = ["aria-label", "placeholder", "title"];
 
-function shouldSkipNode(node: Node) {
+function shouldSkipTextNode(node: Node) {
     const parent = node.parentElement;
 
     if (!parent) {
@@ -15,14 +15,14 @@ function shouldSkipNode(node: Node) {
 
     return Boolean(
         parent.closest(
-            "script, style, textarea, input, select, option, [data-skip-admin-translate]",
+            "script, style, textarea, input, [data-skip-language-sync]",
         ),
     );
 }
 
 function translateTextContent(
     root: HTMLElement,
-    language: "id" | "en",
+    language: Language,
     textSources: WeakMap<Text, string>,
 ) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -33,7 +33,7 @@ function translateTextContent(
     }
 
     textNodes.forEach((node) => {
-        if (shouldSkipNode(node)) {
+        if (shouldSkipTextNode(node)) {
             return;
         }
 
@@ -50,7 +50,7 @@ function translateTextContent(
 
 function translateAttributes(
     root: HTMLElement,
-    language: "id" | "en",
+    language: Language,
     attributeSources: WeakMap<Element, Map<string, string>>,
 ) {
     const elements = root.querySelectorAll<HTMLElement>(
@@ -84,11 +84,11 @@ function translateAttributes(
     });
 }
 
-type AdminLanguageSyncProps = {
+type LanguageSyncProps = {
     children: ReactNode;
 };
 
-export default function AdminLanguageSync({ children }: AdminLanguageSyncProps) {
+export default function LanguageSync({ children }: LanguageSyncProps) {
     const { language } = useLanguage();
     const containerRef = useRef<HTMLDivElement | null>(null);
     const textSources = useRef(new WeakMap<Text, string>());
@@ -108,9 +108,7 @@ export default function AdminLanguageSync({ children }: AdminLanguageSyncProps) 
 
         sync();
 
-        const observer = new MutationObserver(() => {
-            sync();
-        });
+        const observer = new MutationObserver(sync);
 
         observer.observe(root, {
             attributes: true,

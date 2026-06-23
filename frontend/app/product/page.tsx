@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useShop } from "@/context/ShopContext";
 import { useToast } from "@/context/ToastContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { Search } from "lucide-react";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
@@ -24,6 +25,7 @@ export default function ProductPage() {
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
     const { notify } = useToast();
+    const { t } = useLanguage();
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [products, setProducts] = useState<ApiProduct[]>([]);
     const [meta, setMeta] = useState<PaginatedProductsResponse["meta"] | null>(
@@ -124,9 +126,9 @@ export default function ProductPage() {
         if (!user) {
             notify({
                 tone: "warning",
-                title: "Login diperlukan",
+                title: t("Login required"),
                 message:
-                    "Silahkan login terlebih dahulu untuk menambahkan produk ke keranjang.",
+                    t("Please log in first to add products to your cart."),
             });
             return;
         }
@@ -137,20 +139,20 @@ export default function ProductPage() {
             const product = products.find((item) => item.id === productId);
             notify({
                 tone: "cart",
-                title: "Produk masuk ke keranjang",
+                title: t("Product added to cart"),
                 message: product
-                    ? `${product.name} berhasil ditambahkan ke keranjang Anda.`
-                    : "Produk berhasil ditambahkan ke keranjang Anda.",
+                    ? `${product.name} ${t("was successfully added to your cart.")}`
+                    : t("Product was successfully added to your cart."),
                 durationMs: 3200,
             });
         } catch (error) {
             notify({
                 tone: "error",
-                title: "Gagal menambahkan produk",
+                title: t("Failed to add product"),
                 message:
                     error instanceof Error
-                        ? error.message
-                        : "Gagal menambahkan produk ke keranjang.",
+                        ? t(error.message)
+                        : t("Failed to add product to cart."),
             });
         }
     };
@@ -190,7 +192,7 @@ export default function ProductPage() {
                                     htmlFor="product-search"
                                     className="mb-2 block text-sm font-bold text-gray-950"
                                 >
-                                    Search Products
+                                    {t("Search Products")}
                                 </label>
                                 <div className="relative">
                                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-600" />
@@ -201,7 +203,7 @@ export default function ProductPage() {
                                             setSearchQuery(event.target.value);
                                             setPage(1);
                                         }}
-                                        placeholder="Cari laptop, mouse, keyboard, SSD..."
+                                        placeholder={t("Search laptop, mouse, keyboard, SSD...")}
                                         className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                                     />
                                 </div>

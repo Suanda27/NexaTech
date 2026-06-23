@@ -48,8 +48,8 @@ export default function OrderSummaryCards() {
             helper: "Waiting for completion",
         },
         {
-            label: "Delivered",
-            value: summary?.deliveredOrders ?? 0,
+            label: "Completed",
+            value: summary?.completedOrders ?? 0,
             icon: CheckCircle,
             accent: "green",
             helper: "Successfully received",

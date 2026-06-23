@@ -6,12 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Http\UploadedFile;
 use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -25,13 +22,11 @@ use Illuminate\Support\Str;
  * @property string $payment_method
  * @property string $payment_status
  * @property string $status
- * @property string|null $payment_proof
  * @property string|null $midtrans_order_id
  * @property string|null $midtrans_snap_token
  * @property string|null $midtrans_redirect_url
  * @property string|null $midtrans_transaction_status
  * @property string|null $midtrans_payment_type
- * @property string|null $payment_rejection_reason
  * @property string|null $cancellation_reason
  * @property string|null $decline_reason
  * @property int $subtotal
@@ -55,26 +50,20 @@ class Order extends Model
 {
     use HasFactory;
 
-    public const COD_MAX_TOTAL = 300000;
-    public const TRANSFER_PAYMENT_WINDOW_HOURS = 24;
+    public const MIDTRANS_PAYMENT_WINDOW_HOURS = 24;
+    public const TRANSFER_PAYMENT_WINDOW_HOURS = self::MIDTRANS_PAYMENT_WINDOW_HOURS;
 
-    public const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
-    public const PAYMENT_METHOD_COD = 'cod';
     public const PAYMENT_METHOD_MIDTRANS = 'midtrans';
-    public const PAYMENT_PROOF_DISK = 'public';
-    public const PAYMENT_PROOF_DIRECTORY = 'payment-proofs';
-
     public const PAYMENT_STATUS_WAITING_PAYMENT = 'waiting_payment';
-    public const PAYMENT_STATUS_WAITING_VERIFICATION = 'waiting_verification';
-    public const PAYMENT_STATUS_PAID = 'paid';
-    public const PAYMENT_STATUS_REJECTED = 'rejected';
-    public const PAYMENT_STATUS_EXPIRED = 'expired';
-    public const PAYMENT_STATUS_UNPAID = 'unpaid';
+    public const PAYMENT_STATUS_PROCESSING = 'processing';
+    public const PAYMENT_STATUS_SHIPPED = 'shipped';
+    public const PAYMENT_STATUS_COMPLETED = 'completed';
+    public const PAYMENT_STATUS_CANCELLED = 'cancelled';
 
-    public const STATUS_PENDING = 'pending';
+    public const STATUS_WAITING_PAYMENT = 'waiting_payment';
     public const STATUS_PROCESSING = 'processing';
-    public const STATUS_PROGRESSING = 'processing';
-    public const STATUS_DELIVERED = 'delivered';
+    public const STATUS_SHIPPED = 'shipped';
+    public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -88,13 +77,11 @@ class Order extends Model
         'payment_method',
         'payment_status',
         'status',
-        'payment_proof',
         'midtrans_order_id',
         'midtrans_snap_token',
         'midtrans_redirect_url',
         'midtrans_transaction_status',
         'midtrans_payment_type',
-        'payment_rejection_reason',
         'cancellation_reason',
         'decline_reason',
         'subtotal',
@@ -137,49 +124,6 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function paymentProofUrl(): ?string
-    {
-        if (!$this->payment_proof) {
-            return null;
-        }
-
-        if (
-            Str::startsWith($this->payment_proof, 'data:')
-            || Str::startsWith($this->payment_proof, 'http://')
-            || Str::startsWith($this->payment_proof, 'https://')
-            || Str::startsWith($this->payment_proof, '/')
-        ) {
-            return $this->payment_proof;
-        }
-
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-        $disk = Storage::disk(self::PAYMENT_PROOF_DISK);
-
-        return $disk->url($this->payment_proof);
-    }
-
-    public function storePaymentProof(UploadedFile $file): string
-    {
-        $this->deleteStoredPaymentProof();
-
-        return $file->store(self::PAYMENT_PROOF_DIRECTORY, self::PAYMENT_PROOF_DISK);
-    }
-
-    public function deleteStoredPaymentProof(): void
-    {
-        if (
-            !$this->payment_proof
-            || Str::startsWith($this->payment_proof, 'data:')
-            || Str::startsWith($this->payment_proof, 'http://')
-            || Str::startsWith($this->payment_proof, 'https://')
-            || Str::startsWith($this->payment_proof, '/')
-        ) {
-            return;
-        }
-
-        Storage::disk(self::PAYMENT_PROOF_DISK)->delete($this->payment_proof);
-    }
-
     public function hasReservedStock(): bool
     {
         return $this->stock_reserved_at !== null && $this->stock_released_at === null;
@@ -220,23 +164,20 @@ class Order extends Model
         $this->stock_released_at = now();
     }
 
-    public static function expirePendingTransferPayments(): void
+    public static function expirePendingMidtransPayments(): void
     {
-        static::query()
+        /** @var \Illuminate\Database\Eloquent\Builder<App\Models\Order> $query */
+        $query = static::query()
             ->with('items')
-            ->whereIn('payment_method', [
-                self::PAYMENT_METHOD_BANK_TRANSFER,
-                self::PAYMENT_METHOD_MIDTRANS,
-            ])
-            ->whereIn('payment_status', [
-                self::PAYMENT_STATUS_WAITING_PAYMENT,
-                self::PAYMENT_STATUS_REJECTED,
-            ])
+            ->where('payment_method', self::PAYMENT_METHOD_MIDTRANS)
+            ->where('payment_status', self::PAYMENT_STATUS_WAITING_PAYMENT)
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
-            ->whereNull('stock_released_at')
-            ->chunkById(50, function (Collection $orders): void {
+            ->whereNull('stock_released_at');
+
+        $query->chunkById(50, function (Collection $orders): void {
                 DB::transaction(function () use ($orders): void {
+                    /** @var \Illuminate\Support\Collection<int, int> $productIds */
                     $productIds = $orders
                         ->flatMap(fn (Order $order) => $order->items->pluck('product_id'))
                         ->filter()
@@ -251,7 +192,7 @@ class Order extends Model
 
                     foreach ($orders as $order) {
                         $order->releaseReservedStock($lockedProducts);
-                        $order->payment_status = self::PAYMENT_STATUS_EXPIRED;
+                        $order->payment_status = self::PAYMENT_STATUS_CANCELLED;
                         $order->status = self::STATUS_CANCELLED;
                         $order->cancelled_at = now();
                         $order->save();
@@ -259,4 +200,5 @@ class Order extends Model
                 });
             });
     }
+
 }

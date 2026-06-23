@@ -32,13 +32,6 @@ return new class extends Migration
             chunkSize: 2,
         );
 
-        $this->convertTable(
-            table: 'orders',
-            keyColumn: 'id',
-            imageColumn: 'payment_proof',
-            directory: 'payment-proofs',
-            chunkSize: 1,
-        );
     }
 
     public function down(): void

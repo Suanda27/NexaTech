@@ -25,8 +25,7 @@ export function OrderPaymentGuide() {
     return (
         <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4 text-sm leading-6 text-slate-600">
             Setelah checkout, order akan masuk ke status <strong>Waiting Payment</strong>.
-            Upload bukti transfer dari halaman order Anda sebelum deadline berakhir,
-            lalu admin akan memeriksa dan mengubahnya ke <strong>Paid</strong> bila valid.
+            Selesaikan pembayaran sebelum deadline agar sistem dapat memindahkan order ke <strong>Processing</strong>.
         </div>
     );
 }

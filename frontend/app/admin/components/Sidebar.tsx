@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
     ChevronRight,
@@ -14,6 +13,7 @@ import {
     X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const menu = [
     {
@@ -51,6 +51,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     const router = useRouter();
     const pathname = usePathname();
     const { user, logout } = useAuth();
+    const { t } = useLanguage();
 
     const getActiveMenu = () => {
         if (pathname === "/admin/category") return "kategori";
@@ -60,14 +61,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         return "dashboard";
     };
 
-    const [active, setActive] = useState(getActiveMenu());
+    const active = getActiveMenu();
 
-    useEffect(() => {
-        setActive(getActiveMenu());
-    }, [pathname]);
-
-    const handleMenuClick = (itemId: string, href: string) => {
-        setActive(itemId);
+    const handleMenuClick = (href: string) => {
         router.push(href);
         if (window.innerWidth < 1024) {
             onToggle();
@@ -96,7 +92,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         <p className="text-lg font-semibold text-slate-950">
                             NexaTech
                         </p>
-                        <p className="text-sm text-blue-600">Admin Menu</p>
+                        <p className="text-sm text-blue-600">{t("Admin Menu")}</p>
                     </div>
                     <button
                         onClick={onToggle}
@@ -116,7 +112,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                 NexaTech Admin
                             </p>
                             <p className="text-sm text-slate-500">
-                                Commerce control center
+                                {t("Commerce control center")}
                             </p>
                         </div>
                     </div>
@@ -130,15 +126,15 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm text-slate-500">
-                                    Hello,
+                                    {t("Hello,")}
                                 </p>
                                 <p className="truncate text-base font-semibold text-slate-950">
                                     {user?.name ?? "Administrator"}
                                 </p>
                                 <p className="mt-1 text-xs font-medium text-blue-700">
                                     {user?.role === "admin"
-                                        ? "Administrator"
-                                        : "Team Member"}
+                                        ? t("Administrator")
+                                        : t("Team Member")}
                                 </p>
                             </div>
                         </div>
@@ -155,7 +151,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                 <button
                                     key={item.id}
                                     onClick={() =>
-                                        handleMenuClick(item.id, item.href)
+                                        handleMenuClick(item.href)
                                     }
                                     className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
                                         isActive
@@ -172,7 +168,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                         }
                                     />
                                     <span className="truncate">
-                                        {item.label}
+                                        {t(item.label)}
                                     </span>
                                     {isActive && (
                                         <ChevronRight
@@ -193,7 +189,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
                     >
                         <LogOut size={18} />
-                        Sign Out
+                        {t("Sign Out")}
                     </button>
                 </div>
             </aside>

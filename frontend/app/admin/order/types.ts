@@ -2,18 +2,18 @@
 
 import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
 
-export type OrderPaymentMethod = "Bank Transfer" | "COD" | "Midtrans";
+export type OrderPaymentMethod = "Midtrans";
 export type OrderPaymentStatus =
     | "Waiting Payment"
-    | "Waiting Verification"
-    | "Paid"
-    | "Rejected"
-    | "Expired"
-    | "Unpaid";
-export type OrderStatus =
-    | "Pending"
     | "Processing"
-    | "Delivered"
+    | "Shipped"
+    | "Completed"
+    | "Cancelled";
+export type OrderStatus =
+    | "Waiting Payment"
+    | "Processing"
+    | "Shipped"
+    | "Completed"
     | "Cancelled";
 
 export type OrderItem = {
@@ -45,9 +45,7 @@ export type OrderItemData = {
     statusKey: OrderStatusKey;
     status: OrderStatus;
     declineReason: string | null;
-    paymentRejectionReason: string | null;
     cancellationReason: string | null;
-    paymentProofImage: string | null;
     customer: CustomerAddress;
     items: OrderItem[];
 };

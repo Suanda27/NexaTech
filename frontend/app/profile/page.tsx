@@ -1,11 +1,12 @@
 "use client";
 
-import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     CheckCircle2,
     CreditCard,
-    ImagePlus,
+    ExternalLink,
+    LoaderCircle,
     Mail,
     MapPin,
     Package,
@@ -19,14 +20,16 @@ import Footer from "@/app/components/footer/Footer";
 import AuthGuard from "@/app/components/auth/AuthGuard";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { useLanguage } from "@/context/LanguageContext";
 import {
+    completeOrder,
     fetchOrders,
     fetchProfile,
-    uploadOrderPaymentProof,
     updateProfile,
     type OrderData,
     type ProfileResponse,
 } from "@/lib/store";
+import { loadMidtransSnap } from "@/lib/midtrans";
 import OrderAlert from "@/app/components/profile/OrderAlert";
 import {
     getOrderNotice,
@@ -41,6 +44,7 @@ import {
 export default function Page() {
     const { setUser } = useAuth();
     const { notify } = useToast();
+    const { t } = useLanguage();
     const searchParams = useSearchParams();
     const tab = searchParams?.get("tab");
     const [active, setActive] = useState(
@@ -110,13 +114,13 @@ export default function Page() {
         () => ({
             totalOrders: orders.length,
             progressingOrders: orders.filter((order) =>
-                ["pending", "processing"].includes(order.statusKey),
+                ["waiting_payment", "processing", "shipped"].includes(order.statusKey),
             ).length,
-            deliveredOrders: orders.filter(
-                (order) => order.statusKey === "delivered",
+            completedOrders: orders.filter(
+                (order) => order.statusKey === "completed",
             ).length,
             declinedOrders: orders.filter(
-                (order) => order.paymentStatusKey === "rejected",
+                (order) => order.statusKey === "cancelled",
             ).length,
             cancelledOrders: orders.filter(
                 (order) => order.statusKey === "cancelled",
@@ -157,17 +161,17 @@ export default function Page() {
             }));
             notify({
                 tone: "success",
-                title: "Profil berhasil diperbarui",
-                message: "Informasi akun Anda sudah tersimpan dengan aman.",
+                title: t("Profile updated successfully"),
+                message: t("Your account information has been saved securely."),
             });
         } catch (error) {
             notify({
                 tone: "error",
-                title: "Gagal memperbarui profil",
+                title: t("Failed to update profile"),
                 message:
                     error instanceof Error
-                        ? error.message
-                        : "Gagal memperbarui profil.",
+                        ? t(error.message)
+                        : t("Failed to update profile."),
             });
         } finally {
             setIsSaving(false);
@@ -204,13 +208,13 @@ export default function Page() {
                     <aside className="w-full rounded-lg border border-blue-100 bg-white p-5 shadow-sm shadow-blue-100/50 lg:w-72 lg:self-start">
                         <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
                             <p className="text-sm font-semibold text-blue-700">
-                                Customer Profile
+                                {t("Customer Profile")}
                             </p>
                             <h1 className="mt-1 text-2xl font-bold text-slate-950">
-                                {profile?.user.name ?? "Account"}
+                                {profile?.user.name ?? t("Account")}
                             </h1>
                             <p className="mt-2 text-sm text-slate-500">
-                                {profile?.user.email ?? "No email"}
+                                {profile?.user.email ?? t("No email")}
                             </p>
                         </div>
 
@@ -224,7 +228,7 @@ export default function Page() {
                                         : "bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700"
                                 }`}
                             >
-                                Order History
+                                {t("Order History")}
                             </button>
                             <button
                                 type="button"
@@ -235,7 +239,7 @@ export default function Page() {
                                         : "bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700"
                                 }`}
                             >
-                                Personal Info
+                                {t("Personal Info")}
                             </button>
                         </div>
                     </aside>
@@ -253,11 +257,11 @@ export default function Page() {
                                         value={summary?.progressingOrders ?? 0}
                                     />
                                     <SummaryCard
-                                        title="Delivered"
-                                        value={summary?.deliveredOrders ?? 0}
+                                        title="Completed"
+                                        value={summary?.completedOrders ?? 0}
                                     />
                                     <SummaryCard
-                                        title="Declined / Cancelled"
+                                        title="Cancelled Orders"
                                         value={
                                             (summary?.declinedOrders ?? 0) +
                                             (summary?.cancelledOrders ?? 0)
@@ -285,16 +289,16 @@ export default function Page() {
                                             </div>
                                             <div>
                                                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                                                    Account Details
+                                                    {t("Account Details")}
                                                 </p>
                                                 <h2 className="text-xl font-bold text-gray-950">
-                                                    Personal Information
+                                                    {t("Personal Information")}
                                                 </h2>
                                             </div>
                                         </div>
 
                                         <span className="w-fit rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                                            Synced with backend
+                                            {t("Synced with backend")}
                                         </span>
                                     </div>
 
@@ -337,7 +341,7 @@ export default function Page() {
                                                         phone: e.target.value,
                                                     }))
                                                 }
-                                                placeholder="Optional"
+                                                placeholder={t("Optional")}
                                                 className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                                             />
                                         </FieldCard>
@@ -366,7 +370,7 @@ export default function Page() {
                                                         password: e.target.value,
                                                     }))
                                                 }
-                                                placeholder="Optional"
+                                                placeholder={t("Optional")}
                                                 className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                                             />
                                         </FieldCard>
@@ -381,7 +385,7 @@ export default function Page() {
                                                         confirmPassword: e.target.value,
                                                     }))
                                                 }
-                                                placeholder="Optional"
+                                                placeholder={t("Optional")}
                                                 className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-10 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                                             />
                                         </FieldCard>
@@ -392,7 +396,7 @@ export default function Page() {
                                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3.5 font-semibold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200 disabled:opacity-60"
                                         >
                                             <Save className="h-4 w-4" />
-                                            {isSaving ? "Saving..." : "Save Changes"}
+                                            {isSaving ? t("Saving...") : t("Save Changes")}
                                         </button>
                                     </form>
                                 </div>
@@ -408,9 +412,11 @@ export default function Page() {
 }
 
 function SummaryCard({ title, value }: { title: string; value: number }) {
+    const { t } = useLanguage();
+
     return (
         <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm shadow-blue-100/50">
-            <p className="text-sm font-medium text-slate-500">{title}</p>
+            <p className="text-sm font-medium text-slate-500">{t(title)}</p>
             <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>
         </div>
     );
@@ -425,17 +431,19 @@ function OrderSection({
     orders: OrderData[];
     onOrderUpdated: (order: OrderData) => void;
 }) {
+    const { t } = useLanguage();
+
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 className="mb-5 text-xl font-bold text-gray-900">{title}</h2>
+            <h2 className="mb-5 text-xl font-bold text-gray-900">{t(title)}</h2>
 
             {orders.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-6 py-12 text-center">
                     <p className="font-semibold text-slate-950">
-                        Belum ada order
+                        {t("No orders yet")}
                     </p>
                     <p className="mt-2 text-sm text-slate-500">
-                        Semua histori checkout dari akun yang sedang login akan tampil di sini.
+                        {t("All checkout history from the signed-in account will appear here.")}
                     </p>
                 </div>
             ) : (
@@ -461,113 +469,142 @@ function OrderHistoryCard({
     onOrderUpdated: (order: OrderData) => void;
 }) {
     const { notify } = useToast();
-    const [isUploading, setIsUploading] = useState(false);
-    const [selectedPaymentProof, setSelectedPaymentProof] = useState<{
-        name: string;
-        file: File;
-        previewUrl: string;
-    } | null>(null);
+    const { t } = useLanguage();
+    const [isCompleting, setIsCompleting] = useState(false);
+    const [isOpeningMidtrans, setIsOpeningMidtrans] = useState(false);
 
-    useEffect(() => {
-        return () => {
-            if (selectedPaymentProof?.previewUrl) {
-                URL.revokeObjectURL(selectedPaymentProof.previewUrl);
-            }
-        };
-    }, [selectedPaymentProof?.previewUrl]);
-
-    const isTransferOrder = order.paymentMethodKey === "bank_transfer";
+    const isMidtransOrder = order.paymentMethodKey === "midtrans";
     const isWaitingPayment = order.paymentStatusKey === "waiting_payment";
-    const isRejected = order.paymentStatusKey === "rejected";
-    const isExpired = order.paymentStatusKey === "expired";
-    const isCancelledByAdmin = order.statusKey === "cancelled" && !isExpired;
-    const showRejectedPaymentAlert = isRejected && !isCancelledByAdmin;
+    const isCancelledByAdmin = order.statusKey === "cancelled";
     const orderNotice = getOrderNotice(order);
-
-    const canUploadPaymentProof =
-        isTransferOrder &&
+    const canPayMidtrans =
+        isMidtransOrder &&
+        isWaitingPayment &&
         !isCancelledByAdmin &&
-        !isExpired &&
-        (isWaitingPayment || showRejectedPaymentAlert);
-    const showBankTransferAccount = canUploadPaymentProof;
+        Boolean(order.midtransSnapToken);
+    const canCompleteOrder = order.statusKey === "shipped";
 
-    const handlePaymentProofChange = async (
-        event: ChangeEvent<HTMLInputElement>,
-    ) => {
-        const file = event.target.files?.[0];
-
-        if (!file) {
-            return;
-        }
+    const handleCompleteOrder = async () => {
+        setIsCompleting(true);
 
         try {
-            if (!file.type.startsWith("image/")) {
-                throw new Error("File bukti pembayaran harus berupa gambar.");
-            }
-
-            if (file.size > 2 * 1024 * 1024) {
-                throw new Error("Ukuran bukti pembayaran maksimal 2 MB.");
-            }
-
-            setSelectedPaymentProof((current) => {
-                if (current?.previewUrl) {
-                    URL.revokeObjectURL(current.previewUrl);
-                }
-
-                return {
-                    name: file.name,
-                    file,
-                    previewUrl: URL.createObjectURL(file),
-                };
-            });
-        } catch (error) {
-            notify({
-                tone: "error",
-                title: "Gagal membaca bukti pembayaran",
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "Gagal membaca file bukti pembayaran.",
-            });
-        } finally {
-            event.target.value = "";
-        }
-    };
-
-    const handleSubmitPaymentProof = async () => {
-        if (!selectedPaymentProof) {
-            return;
-        }
-
-        setIsUploading(true);
-
-        try {
-            const response = await uploadOrderPaymentProof(order.id, {
-                payment_proof: selectedPaymentProof.file,
-            });
-
-            if (selectedPaymentProof.previewUrl) {
-                URL.revokeObjectURL(selectedPaymentProof.previewUrl);
-            }
-
-            setSelectedPaymentProof(null);
+            const response = await completeOrder(order.id);
             onOrderUpdated(response.data);
             notify({
                 tone: "success",
-                title: "Bukti pembayaran terkirim",
-                message: response.message,
+                title: t("Order completed"),
+                message: t(response.message),
             });
         } catch (error) {
             notify({
                 tone: "error",
-                title: "Upload bukti gagal",
+                title: t("Failed to complete order"),
                 message:
                     error instanceof Error
-                        ? error.message
-                        : "Gagal mengupload bukti pembayaran.",
+                        ? t(error.message)
+                        : t("Failed to complete order."),
             });
         } finally {
-            setIsUploading(false);
+            setIsCompleting(false);
+        }
+    };
+
+    const refreshCurrentOrder = async () => {
+        const response = await fetchOrders();
+        const updatedOrder = response.data.find((item) => item.id === order.id);
+
+        if (updatedOrder) {
+            onOrderUpdated(updatedOrder);
+        }
+    };
+
+    const handlePayMidtrans = async () => {
+        if (!order.midtransSnapToken) {
+            return;
+        }
+
+        setIsOpeningMidtrans(true);
+
+        try {
+            await loadMidtransSnap();
+
+            if (!window.snap) {
+                throw new Error("Popup pembayaran Midtrans belum siap.");
+            }
+
+            await new Promise<void>((resolve) => {
+                let isHandled = false;
+                const finish = async (
+                    tone: "success" | "warning" | "error",
+                    title: string,
+                    message: string,
+                    shouldRefresh = true,
+                ) => {
+                    if (isHandled) {
+                        return;
+                    }
+
+                    isHandled = true;
+
+                    if (shouldRefresh) {
+                        try {
+                            await refreshCurrentOrder();
+                        } catch {
+                            // Snap callbacks must never leave the payment button stuck.
+                        }
+                    }
+
+                    notify({
+                        tone,
+                        title: t(title),
+                        message: t(message),
+                    });
+                    resolve();
+                };
+
+                window.snap?.pay(order.midtransSnapToken ?? "", {
+                    onSuccess: () => {
+                        void finish(
+                            "success",
+                            "Payment successful",
+                            "Midtrans payment is complete. Order status will be updated automatically.",
+                        );
+                    },
+                    onPending: () => {
+                        void finish(
+                            "warning",
+                            "Payment is not complete",
+                            "Order is waiting for Midtrans payment. Complete payment on the Midtrans page so the status updates automatically.",
+                        );
+                    },
+                    onError: () => {
+                        void finish(
+                            "error",
+                            "Payment cancelled",
+                            "Midtrans payment failed to process. You can try again before the payment deadline.",
+                        );
+                    },
+                    onClose: () => {
+                        void finish(
+                            "warning",
+                            "Payment is not complete",
+                            "Midtrans popup was closed. The order is still waiting for payment.",
+                            false,
+                        );
+                    },
+                });
+            });
+        } catch (error) {
+            notify({
+                tone: "error",
+                title: t("Checkout failed"),
+                message:
+                    error instanceof Error
+                        ? t(error.message)
+                        : t("Failed to open Midtrans payment."),
+            });
+        } finally {
+            setIsOpeningMidtrans(false);
         }
     };
 
@@ -580,25 +617,25 @@ function OrderHistoryCard({
                             {order.orderNumber}
                         </span>
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                            {getPaymentStatusLabel(order.paymentStatusKey)}
+                            {t(getPaymentStatusLabel(order.paymentStatusKey))}
                         </span>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                            {getOrderStatusLabel(order.statusKey)}
+                            {t(getOrderStatusLabel(order.statusKey))}
                         </span>
                     </div>
                     <p className="text-sm text-slate-500">
                         {order.orderDate} - {order.paymentMethod}
                     </p>
-                    {canUploadPaymentProof && (
+                    {canPayMidtrans && (
                         <PaymentCountdown
                             key={`${order.id}-${order.paymentExpiresAt ?? "expired"}`}
                             expiresAt={order.paymentExpiresAt}
                             label={
-                                showRejectedPaymentAlert
-                                    ? "Sisa waktu upload ulang"
-                                    : "Sisa pembayaran"
+                                canPayMidtrans
+                                    ? t("Remaining payment time")
+                                    : t("Remaining payment time")
                             }
-                            tone={showRejectedPaymentAlert ? "danger" : "warning"}
+                            tone="warning"
                         />
                     )}
                 </div>
@@ -632,7 +669,7 @@ function OrderHistoryCard({
                                 {item.productName}
                             </p>
                             <p className="text-sm text-slate-500">
-                                Qty {item.quantity}
+                                {t("Qty")} {item.quantity}
                             </p>
                         </div>
                         <p className="text-sm font-semibold text-slate-900">
@@ -645,108 +682,56 @@ function OrderHistoryCard({
             {orderNotice && (
                 <div className="mt-4">
                     <OrderAlert variant={orderNotice.variant}>
-                        {orderNotice.message}
+                        {t(orderNotice.message)}
                     </OrderAlert>
                 </div>
             )}
 
-            {showBankTransferAccount && (
+            {canPayMidtrans && (
                 <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
                     <p className="text-sm font-semibold text-slate-900">
-                        Detail Rekening Transfer
+                        {t("Midtrans Payment")}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                        Silakan transfer pembayaran ke rekening berikut sesuai total
-                        pesanan Anda.
+                        {t("Continue payment through the secure Midtrans popup before the payment deadline.")}
                     </p>
-
-                    <div className="mt-4 flex flex-col gap-4 rounded-xl border border-blue-200 bg-[linear-gradient(135deg,#eff6ff_0%,#dbeafe_100%)] p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0055B8] text-lg font-black tracking-[0.2em] text-white shadow-lg shadow-blue-200">
-                                BCA
-                            </div>
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
-                                    Bank Tujuan
-                                </p>
-                                <p className="mt-1 text-lg font-bold text-slate-950">
-                                    Bank BCA
-                                </p>
-                                <p className="text-sm text-slate-600">
-                                    Transfer manual customer
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-blue-100 sm:min-w-[220px]">
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                                Nomor Rekening
-                            </p>
-                            <p className="mt-1 text-2xl font-black tracking-[0.14em] text-slate-950">
-                                8210997939
-                            </p>
-                        </div>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void handlePayMidtrans()}
+                        disabled={isOpeningMidtrans}
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {isOpeningMidtrans ? (
+                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <ExternalLink className="h-4 w-4" />
+                        )}
+                        {isOpeningMidtrans ? t("Opening...") : t("Pay with Midtrans")}
+                    </button>
                 </div>
             )}
 
-            {canUploadPaymentProof && (
+            {canCompleteOrder && (
                 <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
                     <p className="text-sm font-semibold text-slate-900">
-                        Upload Bukti Pembayaran
+                        {t("Complete Order")}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                        Kirim screenshot atau foto bukti transfer agar admin dapat
-                        mengecek pembayaran Anda.
+                        {t("Confirm that your order has arrived and mark it as completed.")}
                     </p>
-
-                    {selectedPaymentProof && (
-                        <div className="mt-4 flex items-center gap-4 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
-                            <div className="h-16 w-16 overflow-hidden rounded-lg bg-white ring-1 ring-blue-100">
-                                <img
-                                    src={selectedPaymentProof.previewUrl}
-                                    alt={selectedPaymentProof.name}
-                                    className="h-full w-full object-cover"
-                                />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-slate-900">
-                                    {selectedPaymentProof.name}
-                                </p>
-                                <p className="text-sm text-slate-500">
-                                    Gambar siap dikirim ke admin.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                        <label
-                            htmlFor={`payment-proof-${order.id}`}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                        >
-                            <ImagePlus className="h-4 w-4" />
-                            Pilih Gambar
-                        </label>
-                        <button
-                            type="button"
-                            onClick={handleSubmitPaymentProof}
-                            disabled={!selectedPaymentProof || isUploading}
-                            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
+                    <button
+                        type="button"
+                        onClick={() => void handleCompleteOrder()}
+                        disabled={isCompleting}
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {isCompleting ? (
+                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                        ) : (
                             <CheckCircle2 className="h-4 w-4" />
-                            {isUploading ? "Mengirim..." : "Kirim Bukti"}
-                        </button>
-                    </div>
-
-                    <input
-                        id={`payment-proof-${order.id}`}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePaymentProofChange}
-                        disabled={isUploading}
-                    />
+                        )}
+                        {isCompleting ? t("Processing...") : t("Mark as Completed")}
+                    </button>
                 </div>
             )}
 
@@ -755,7 +740,7 @@ function OrderHistoryCard({
                     <Truck className="h-5 w-5 text-blue-600" />
                     <div>
                         <p className="text-sm font-bold text-gray-900">
-                            Shipping
+                            {t("Shipping")}
                         </p>
                         <p className="text-xs text-gray-600">
                             {order.customer.address}, {order.customer.city}
@@ -767,10 +752,10 @@ function OrderHistoryCard({
                     <CreditCard className="h-5 w-5 text-blue-600" />
                     <div>
                         <p className="text-sm font-bold text-gray-900">
-                            Payment
+                            {t("Payment")}
                         </p>
                         <p className="text-xs text-gray-600">
-                            {order.paymentMethod} - {getPaymentStatusLabel(order.paymentStatusKey)}
+                            {t(order.paymentMethod)} - {t(getPaymentStatusLabel(order.paymentStatusKey))}
                         </p>
                     </div>
                 </div>
@@ -844,10 +829,12 @@ function FieldCard({
     icon: ReactNode;
     children: ReactNode;
 }) {
+    const { t } = useLanguage();
+
     return (
         <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-4 transition focus-within:border-blue-200 focus-within:bg-white focus-within:shadow-sm">
             <label className="mb-2 block text-sm font-medium text-gray-700">
-                {label}
+                {t(label)}
             </label>
             <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2">

@@ -14,17 +14,17 @@ class AdminDashboardController extends Controller
 {
     public function index()
     {
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
         $monthKeyExpression = $this->monthKeyExpression();
 
         $totalRevenue = Order::query()
-            ->where('status', Order::STATUS_DELIVERED)
+            ->where('status', Order::STATUS_COMPLETED)
             ->sum('total');
 
         $totalOrders = Order::count();
         $totalProducts = Product::count();
-        $deliveredOrders = Order::query()
-            ->where('status', Order::STATUS_DELIVERED)
+        $completedOrders = Order::query()
+            ->where('status', Order::STATUS_COMPLETED)
             ->count();
 
         $months = collect(range(5, 0))->map(function (int $offset) {
@@ -80,7 +80,7 @@ class AdminDashboardController extends Controller
                     'totalOrders' => (int) $totalOrders,
                     'totalProducts' => (int) $totalProducts,
                     'fulfillmentRate' => $totalOrders > 0
-                        ? round(($deliveredOrders / $totalOrders) * 100, 1)
+                        ? round(($completedOrders / $totalOrders) * 100, 1)
                         : 0,
                 ],
                 'chart' => $chart,

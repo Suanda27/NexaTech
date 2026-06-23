@@ -29,7 +29,9 @@ export function getOrderTotal(items: OrderItem[]): number {
 }
 
 export function getStatusClasses(status: OrderStatus): string {
-    const normalizedStatus = status.toLowerCase() as OrderStatusKey;
+    const normalizedStatus = status
+        .toLowerCase()
+        .replace(/\s+/g, "_") as OrderStatusKey;
     return sharedOrderStatusClasses(normalizedStatus);
 }
 
@@ -46,7 +48,6 @@ export function getPaymentStatusClasses(
 export function getPaymentMethodClasses(
     method: OrderPaymentMethod,
 ): string {
-    return method === "Bank Transfer"
-        ? "bg-white text-blue-700 ring-blue-100"
-        : "bg-white text-slate-700 ring-slate-200";
+    // Only Midtrans supported
+    return "bg-white text-slate-700 ring-slate-200";
 }

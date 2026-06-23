@@ -6,7 +6,6 @@ use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,9 +15,8 @@ class OrderCheckoutService
 {
     public function createFromCart(User $user, array $payload, ?callable $afterOrderCreated = null): Order
     {
-        $cartItems = CartItem::query()
+        $cartItems = CartItem::where('user_id', $user->id)
             ->with('product')
-            ->where('user_id', $user->id)
             ->get();
 
         if ($cartItems->isEmpty()) {
@@ -40,29 +38,13 @@ class OrderCheckoutService
                 'city' => $payload['city'],
                 'postal_code' => $payload['postal_code'],
                 'payment_method' => $payload['payment_method'],
-                'payment_status' => in_array($payload['payment_method'], [
-                    Order::PAYMENT_METHOD_BANK_TRANSFER,
-                    Order::PAYMENT_METHOD_MIDTRANS,
-                ], true)
-                    ? Order::PAYMENT_STATUS_WAITING_PAYMENT
-                    : Order::PAYMENT_STATUS_UNPAID,
-                'status' => in_array($payload['payment_method'], [
-                    Order::PAYMENT_METHOD_BANK_TRANSFER,
-                    Order::PAYMENT_METHOD_MIDTRANS,
-                ], true)
-                    ? Order::STATUS_PENDING
-                    : Order::STATUS_PROCESSING,
-                'payment_proof' => null,
+                'payment_status' => Order::PAYMENT_STATUS_WAITING_PAYMENT,
+                'status' => Order::STATUS_WAITING_PAYMENT,
                 'subtotal' => $totals['subtotal'],
                 'shipping_fee' => $totals['shipping_fee'],
                 'tax_amount' => $totals['tax_amount'],
                 'total' => $totals['total'],
-                'expires_at' => in_array($payload['payment_method'], [
-                    Order::PAYMENT_METHOD_BANK_TRANSFER,
-                    Order::PAYMENT_METHOD_MIDTRANS,
-                ], true)
-                    ? now()->addHours(Order::TRANSFER_PAYMENT_WINDOW_HOURS)
-                    : null,
+                'expires_at' => now()->addHours(Order::TRANSFER_PAYMENT_WINDOW_HOURS),
                 'ordered_at' => now(),
                 'stock_reserved_at' => now(),
             ]);
@@ -102,25 +84,7 @@ class OrderCheckoutService
         });
     }
 
-    public function submitPaymentProof(Order $order, UploadedFile $paymentProof): Order
-    {
-        $this->guardPaymentProofSubmission($order);
-
-        $paymentProofPath = $order->storePaymentProof($paymentProof);
-
-        $order->forceFill([
-            'payment_proof' => $paymentProofPath,
-            'payment_status' => Order::PAYMENT_STATUS_WAITING_VERIFICATION,
-            'payment_submitted_at' => now(),
-            'payment_rejection_reason' => null,
-            'cancellation_reason' => null,
-            'decline_reason' => null,
-        ])->save();
-
-        return $order->fresh()->load('items');
-    }
-
-    public function cancelPendingMidtransOrder(Order $order, User $user): Order
+    public function completeShippedOrder(Order $order, User $user): Order
     {
         return DB::transaction(function () use ($order, $user): Order {
             /** @var Order $lockedOrder */
@@ -134,37 +98,16 @@ class OrderCheckoutService
                 abort(404);
             }
 
-            if (
-                $lockedOrder->payment_method !== Order::PAYMENT_METHOD_MIDTRANS
-                || $lockedOrder->payment_status !== Order::PAYMENT_STATUS_WAITING_PAYMENT
-                || $lockedOrder->status !== Order::STATUS_PENDING
-            ) {
+            if ($lockedOrder->status !== Order::STATUS_SHIPPED) {
                 throw ValidationException::withMessages([
-                    'order' => ['Order ini sudah tidak bisa dibatalkan dari popup pembayaran.'],
+                    'status' => ['Order hanya bisa diselesaikan setelah dikirim.'],
                 ]);
             }
 
-            $productIds = $lockedOrder->items
-                ->pluck('product_id')
-                ->filter()
-                ->unique()
-                ->values();
-
-            $lockedProducts = Product::query()
-                ->whereIn('id', $productIds)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
-
-            $lockedOrder->releaseReservedStock($lockedProducts);
-            $this->restoreOrderItemsToCart($lockedOrder, $user->id);
-
             $lockedOrder->forceFill([
-                'payment_status' => Order::PAYMENT_STATUS_EXPIRED,
-                'status' => Order::STATUS_CANCELLED,
-                'cancelled_at' => now(),
-                'cancellation_reason' => 'Popup pembayaran Midtrans ditutup oleh customer.',
-                'decline_reason' => 'Popup pembayaran Midtrans ditutup oleh customer.',
+                'status' => Order::STATUS_COMPLETED,
+                'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
+                'delivered_at' => $lockedOrder->delivered_at ?? now(),
             ])->save();
 
             return $lockedOrder->fresh()->load('items');
@@ -177,6 +120,7 @@ class OrderCheckoutService
      */
     protected function lockProductsForCart(Collection $cartItems): Collection
     {
+        /** @var \Illuminate\Support\Collection<int, int> $productIds */
         $productIds = $cartItems
             ->pluck('product_id')
             ->filter()
@@ -226,12 +170,9 @@ class OrderCheckoutService
 
         $total = $subtotal + $shippingFee + $taxAmount;
 
-        if (
-            $paymentMethod === Order::PAYMENT_METHOD_COD
-            && $total > Order::COD_MAX_TOTAL
-        ) {
+        if ($paymentMethod !== Order::PAYMENT_METHOD_MIDTRANS) {
             throw ValidationException::withMessages([
-                'payment_method' => ['COD hanya tersedia untuk total belanja maksimal Rp 300.000.'],
+                'payment_method' => ['Metode pembayaran tidak valid. Hanya Midtrans yang didukung.'],
             ]);
         }
 
@@ -255,47 +196,4 @@ class OrderCheckoutService
         $product->save();
     }
 
-    protected function restoreOrderItemsToCart(Order $order, int $userId): void
-    {
-        foreach ($order->items as $item) {
-            if (!$item->product_id) {
-                continue;
-            }
-
-            $cartItem = CartItem::query()->firstOrNew([
-                'user_id' => $userId,
-                'product_id' => $item->product_id,
-            ]);
-
-            $cartItem->quantity = ($cartItem->exists ? $cartItem->quantity : 0) + (int) $item->quantity;
-            $cartItem->save();
-        }
-    }
-
-    protected function guardPaymentProofSubmission(Order $order): void
-    {
-        if ($order->payment_method !== Order::PAYMENT_METHOD_BANK_TRANSFER) {
-            throw ValidationException::withMessages([
-                'payment_proof' => ['Order COD tidak memerlukan bukti pembayaran.'],
-            ]);
-        }
-
-        if ($order->payment_status === Order::PAYMENT_STATUS_PAID) {
-            throw ValidationException::withMessages([
-                'payment_proof' => ['Pembayaran order ini sudah terverifikasi.'],
-            ]);
-        }
-
-        if ($order->payment_status === Order::PAYMENT_STATUS_EXPIRED) {
-            throw ValidationException::withMessages([
-                'payment_proof' => ['Batas waktu pembayaran order ini sudah habis.'],
-            ]);
-        }
-
-        if ($order->status === Order::STATUS_CANCELLED || $order->status === Order::STATUS_DELIVERED) {
-            throw ValidationException::withMessages([
-                'payment_proof' => ['Order ini sudah tidak bisa menerima bukti pembayaran baru.'],
-            ]);
-        }
-    }
 }

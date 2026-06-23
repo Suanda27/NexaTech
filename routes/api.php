@@ -43,8 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
-    Route::post('/orders/{order}/payment-proof', [OrderController::class, 'submitPaymentProof']);
-    Route::post('/orders/{order}/midtrans-cancel', [OrderController::class, 'cancelPendingMidtrans']);
+    Route::post('/orders/{order}/sync-midtrans', [OrderController::class, 'syncMidtrans']);
+    Route::post('/orders/{order}/complete', [OrderController::class, 'complete']);
 
     Route::post('/product-searches', [CatalogController::class, 'storeSearch']);
     Route::get('/recommendations', [CatalogController::class, 'recommendations']);

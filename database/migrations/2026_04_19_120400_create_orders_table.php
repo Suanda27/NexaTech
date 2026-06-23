@@ -18,9 +18,8 @@ return new class extends Migration
             $table->string('city');
             $table->string('postal_code');
             $table->string('payment_method');
-            $table->string('payment_status')->default('unpaid');
-            $table->string('status')->default('progressing');
-            $table->longText('payment_proof')->nullable();
+            $table->string('payment_status')->default('waiting_payment');
+            $table->string('status')->default('waiting_payment');
             $table->text('decline_reason')->nullable();
             $table->unsignedBigInteger('subtotal')->default(0);
             $table->unsignedBigInteger('shipping_fee')->default(0);

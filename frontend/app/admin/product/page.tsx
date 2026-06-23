@@ -14,6 +14,7 @@ import ProductTable from "./ProductTable";
 import AddProductModal from "./components/AddProductModal";
 import EditProductModal from "./components/EditProductModal";
 import DeleteProductModal from "./components/DeleteProductModal";
+import { useLanguage } from "@/context/LanguageContext";
 import type {
     ProductFormValues,
     ProductItem,
@@ -81,7 +82,19 @@ function normalizeProduct(item: {
     };
 }
 
+function mapUiStatusToApi(status: ProductItem["status"]) {
+    switch (status) {
+        case "Inactive":
+            return "inactive";
+        case "Out of Stock":
+            return "out_of_stock";
+        default:
+            return "active";
+    }
+}
+
 export default function ProductPage() {
+    const { t } = useLanguage();
     const [products, setProducts] = useState<ProductItem[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>({
         currentPage: 1,
@@ -222,10 +235,6 @@ export default function ProductPage() {
         };
     }, [currentPage, meta.perPage, searchQuery, selectedCategory, selectedStatus]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery, selectedCategory, selectedStatus]);
-
     const categories = useMemo(
         () => categoryLookup.map((category) => category.name),
         [categoryLookup],
@@ -257,17 +266,6 @@ export default function ProductPage() {
         }
     };
 
-    const mapUiStatusToApi = (status: ProductItem["status"]) => {
-        switch (status) {
-            case "Inactive":
-                return "inactive";
-            case "Out of Stock":
-                return "out_of_stock";
-            default:
-                return "active";
-        }
-    };
-
     const handleAddProduct = async (payload: ProductFormValues) => {
         try {
             await createAdminProduct({
@@ -291,7 +289,7 @@ export default function ProductPage() {
             await loadData(currentPage);
         } catch (error) {
             alert(
-                error instanceof Error ? error.message : "Gagal menambahkan produk.",
+                error instanceof Error ? t(error.message) : t("Failed to add product."),
             );
         }
     };
@@ -323,7 +321,7 @@ export default function ProductPage() {
             await loadData(currentPage);
         } catch (error) {
             alert(
-                error instanceof Error ? error.message : "Gagal memperbarui produk.",
+                error instanceof Error ? t(error.message) : t("Failed to update product."),
             );
         }
     };
@@ -339,7 +337,7 @@ export default function ProductPage() {
             await loadData(currentPage);
         } catch (error) {
             alert(
-                error instanceof Error ? error.message : "Gagal menghapus produk.",
+                error instanceof Error ? t(error.message) : t("Failed to delete product."),
             );
         }
     };
@@ -351,22 +349,20 @@ export default function ProductPage() {
                     <div className="space-y-5">
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
                             <Sparkles className="h-3.5 w-3.5" />
-                            Refined product management
+                            {t("Refined product management")}
                         </div>
 
                         <div className="space-y-3">
                             <div>
                                 <p className="text-sm font-medium text-slate-500">
-                                    Catalog operations
+                                    {t("Catalog operations")}
                                 </p>
                                 <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                    Manajemen Produk
+                                    {t("Product Management")}
                                 </h1>
                             </div>
                             <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Semua produk, gambar, stok, dan key specification
-                                sekarang disimpan lewat backend, jadi admin dan
-                                customer membaca sumber data yang sama.
+                                {t("All products, images, stock, and key specifications are now stored through the backend, so admin and customer read from the same data source.")}
                             </p>
                         </div>
 
@@ -376,7 +372,7 @@ export default function ProductPage() {
                             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
                         >
                             <PackagePlus className="h-4 w-4" />
-                            Tambah Produk
+                            {t("Add Product")}
                         </button>
                     </div>
 
@@ -385,7 +381,7 @@ export default function ProductPage() {
                             <div className="flex items-center justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                        Total Products
+                                        {t("Total Products")}
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
                                         {summary.totalProducts}
@@ -396,7 +392,7 @@ export default function ProductPage() {
                                 </div>
                             </div>
                             <p className="mt-3 text-xs text-slate-500">
-                                {activeProducts} active products in catalog
+                                {activeProducts} {t("active products in catalog")}
                             </p>
                         </div>
 
@@ -404,7 +400,7 @@ export default function ProductPage() {
                             <div className="flex items-center justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
-                                        Inventory Value
+                                        {t("Inventory Value")}
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold">
                                         {formatPrice(totalInventoryValue)}
@@ -415,7 +411,7 @@ export default function ProductPage() {
                                 </div>
                             </div>
                             <p className="mt-3 text-xs text-slate-300">
-                                {totalStock} total stock units available
+                                {totalStock} {t("total stock units available")}
                             </p>
                         </div>
                     </div>
@@ -430,12 +426,10 @@ export default function ProductPage() {
                                 <Siren className="mt-0.5 h-5 w-5 text-red-600" />
                                 <div>
                                     <p className="text-sm font-semibold text-red-700">
-                                        Produk stok habis
+                                        {t("Out of stock products")}
                                     </p>
                                     <p className="mt-1 text-sm leading-6 text-red-700">
-                                        {outOfStockProducts} produk sudah habis dan
-                                        customer tidak bisa checkout sampai stok
-                                        diperbarui.
+                                        {outOfStockProducts} {t("products are out of stock and customers cannot checkout until stock is updated.")}
                                     </p>
                                 </div>
                             </div>
@@ -446,12 +440,10 @@ export default function ProductPage() {
                                 <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
                                 <div>
                                     <p className="text-sm font-semibold text-amber-700">
-                                        Produk stok menipis
+                                        {t("Low stock products")}
                                     </p>
                                     <p className="mt-1 text-sm leading-6 text-amber-700">
-                                        {lowStockProducts} produk tinggal sedikit.
-                                        Bagus untuk segera restock sebelum order
-                                        baru masuk.
+                                        {lowStockProducts} {t("products are running low. Restock soon before new orders arrive.")}
                                     </p>
                                 </div>
                             </div>
@@ -462,10 +454,10 @@ export default function ProductPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-medium text-blue-700">
-                            Product Directory
+                            {t("Product Directory")}
                         </p>
                         <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-                            Daftar Produk
+                            {t("Product List")}
                         </h2>
                     </div>
 
@@ -475,22 +467,24 @@ export default function ProductPage() {
                             <input
                                 type="text"
                                 value={searchQuery}
-                                onChange={(event) =>
-                                    setSearchQuery(event.target.value)
-                                }
-                                placeholder="Cari nama produk, SKU, atau deskripsi..."
+                                onChange={(event) => {
+                                    setSearchQuery(event.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder={t("Search product name, SKU, or description...")}
                                 className="w-full rounded-lg border border-blue-100 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                             />
                         </div>
 
                         <select
                             value={selectedCategory}
-                            onChange={(event) =>
-                                setSelectedCategory(event.target.value)
-                            }
+                            onChange={(event) => {
+                                setSelectedCategory(event.target.value);
+                                setCurrentPage(1);
+                            }}
                             className="rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         >
-                            <option value="Semua Kategori">Semua Kategori</option>
+                            <option value="Semua Kategori">{t("All Categories")}</option>
                             {categories.map((category) => (
                                 <option key={category} value={category}>
                                     {category}
@@ -500,15 +494,16 @@ export default function ProductPage() {
 
                         <select
                             value={selectedStatus}
-                            onChange={(event) =>
-                                setSelectedStatus(event.target.value)
-                            }
+                            onChange={(event) => {
+                                setSelectedStatus(event.target.value);
+                                setCurrentPage(1);
+                            }}
                             className="rounded-lg border border-blue-100 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         >
-                            <option value="Semua Status">Semua Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                            <option value="Out of Stock">Out of Stock</option>
+                            <option value="Semua Status">{t("All Statuses")}</option>
+                            <option value="Active">{t("Active")}</option>
+                            <option value="Inactive">{t("Inactive")}</option>
+                            <option value="Out of Stock">{t("Out of Stock")}</option>
                         </select>
                     </div>
                 </div>
@@ -524,7 +519,7 @@ export default function ProductPage() {
 
                 <div className="mt-4 flex flex-col gap-3 border-t border-blue-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                     <p>
-                        Menampilkan {products.length} produk dari total {meta.total} data.
+                        {t("Showing")} {products.length} {t("products")} {t("from total")} {meta.total} {t("data entries")}.
                     </p>
                     <div className="flex items-center gap-2 self-start sm:self-auto">
                         <button
@@ -533,10 +528,10 @@ export default function ProductPage() {
                             disabled={meta.currentPage <= 1}
                             className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Sebelumnya
+                            {t("Previous")}
                         </button>
                         <span className="rounded-lg bg-blue-50 px-3 py-2 font-medium text-blue-700">
-                            Halaman {meta.currentPage} / {meta.lastPage}
+                            {t("Page")} {meta.currentPage} / {meta.lastPage}
                         </span>
                         <button
                             type="button"
@@ -548,7 +543,7 @@ export default function ProductPage() {
                             disabled={meta.currentPage >= meta.lastPage}
                             className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Berikutnya
+                            {t("Next")}
                         </button>
                     </div>
                 </div>

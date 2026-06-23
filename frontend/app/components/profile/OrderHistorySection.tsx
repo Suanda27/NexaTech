@@ -6,7 +6,7 @@ import { Package } from "lucide-react";
 import { fetchOrders, type OrderData } from "@/lib/store";
 
 export default function OrderHistorySection() {
-    const [active, setActive] = useState<"bank" | "cod">("bank");
+    const [isLoadingOrders, setIsLoadingOrders] = useState(true);
     const [orders, setOrders] = useState<OrderData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -38,15 +38,7 @@ export default function OrderHistorySection() {
         };
     }, []);
 
-    const filtered = useMemo(
-        () =>
-            orders.filter((order) =>
-                active === "bank"
-                    ? order.paymentMethodKey === "bank_transfer"
-                    : order.paymentMethodKey === "cod",
-            ),
-        [active, orders],
-    );
+    const filtered = useMemo(() => orders.filter((order) => order.paymentMethodKey === "midtrans"), [orders]);
 
     return (
         <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
@@ -54,31 +46,7 @@ export default function OrderHistorySection() {
                 Order History
             </h2>
 
-            <div className="mb-6 flex w-full gap-2 overflow-x-auto rounded-lg bg-gray-100 p-1 sm:w-fit">
-                <button
-                    type="button"
-                    onClick={() => setActive("bank")}
-                    className={`min-w-max rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 sm:px-6 ${
-                        active === "bank"
-                            ? "bg-white text-black shadow-md"
-                            : "text-gray-500 hover:text-black"
-                    }`}
-                >
-                    Bank Transfer
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => setActive("cod")}
-                    className={`min-w-max rounded-lg px-5 py-2 text-sm font-semibold transition-all duration-200 sm:px-6 ${
-                        active === "cod"
-                            ? "bg-white text-black shadow-md"
-                            : "text-gray-500 hover:text-black"
-                    }`}
-                >
-                    Cash on Delivery
-                </button>
-            </div>
+            {/* Showing Midtrans orders only */}
 
             {isLoading ? (
                 <div className="space-y-4">

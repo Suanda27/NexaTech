@@ -61,9 +61,9 @@ class ApiEndpointSmokeTest extends TestCase
                 'address' => 'Batam',
                 'city' => 'Batam',
                 'postal_code' => '29433',
-                'payment_method' => Order::PAYMENT_METHOD_COD,
-                'payment_status' => Order::PAYMENT_STATUS_PAID,
-                'status' => Order::STATUS_DELIVERED,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+                'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
+                'status' => Order::STATUS_COMPLETED,
                 'subtotal' => 15000000,
                 'shipping_fee' => 0,
                 'tax_amount' => 0,
@@ -134,9 +134,9 @@ class ApiEndpointSmokeTest extends TestCase
             'address' => 'Batam',
             'city' => 'Batam',
             'postal_code' => '29433',
-            'payment_method' => Order::PAYMENT_METHOD_COD,
-            'payment_status' => Order::PAYMENT_STATUS_PAID,
-            'status' => Order::STATUS_DELIVERED,
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
+            'status' => Order::STATUS_COMPLETED,
             'subtotal' => $laptop->price,
             'shipping_fee' => 0,
             'tax_amount' => 0,
@@ -251,9 +251,9 @@ class ApiEndpointSmokeTest extends TestCase
             'address' => 'Batam',
             'city' => 'Batam',
             'postal_code' => '29433',
-            'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
-            'payment_status' => Order::PAYMENT_STATUS_PAID,
-            'status' => Order::STATUS_DELIVERED,
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
+            'status' => Order::STATUS_COMPLETED,
             'subtotal' => $product->price,
             'shipping_fee' => 0,
             'tax_amount' => 0,
@@ -314,8 +314,8 @@ class ApiEndpointSmokeTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.name', 'NexaKeyboard');
 
-        $createdProductId = Product::query()->where('sku', 'SKU-KEY-001')->value('id');
-        $createdProductImagePath = Product::query()->where('sku', 'SKU-KEY-001')->value('image_url');
+        $createdProductId = Product::where('sku', 'SKU-KEY-001')->value('id');
+        $createdProductImagePath = Product::where('sku', 'SKU-KEY-001')->value('image_url');
 
         $this->actingAs($admin, 'sanctum')
             ->putJson("/api/admin/products/{$createdProductId}", [
@@ -358,7 +358,9 @@ class ApiEndpointSmokeTest extends TestCase
             ->assertJsonPath('message', 'Produk berhasil dihapus.');
 
         if (is_string($createdProductImagePath) && $createdProductImagePath !== '') {
-            Storage::disk('public')->assertMissing($createdProductImagePath);
+            /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
+            $storage = Storage::disk('public');
+            $storage->assertMissing($createdProductImagePath);
         }
     }
 

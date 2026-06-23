@@ -8,6 +8,7 @@ import {
     Tags,
 } from "lucide-react";
 import type { ApiCategory } from "@/lib/store";
+import { useLanguage } from "@/context/LanguageContext";
 
 type FilterPanelProps = {
     categories: ApiCategory[];
@@ -30,6 +31,8 @@ export function FilterPanel({
     onSortChange,
     onReset,
 }: FilterPanelProps) {
+    const { t } = useLanguage();
+
     return (
         <div className="overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/50 transition duration-300 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70 lg:sticky lg:top-6">
             <div className="border-b border-blue-100 bg-blue-50/70 p-5">
@@ -39,10 +42,10 @@ export function FilterPanel({
                     </span>
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                            Product Filter
+                            {t("Product Filter")}
                         </p>
                         <h2 className="font-bold text-gray-950">
-                            Refine Results
+                            {t("Refine Results")}
                         </h2>
                     </div>
                 </div>
@@ -53,7 +56,7 @@ export function FilterPanel({
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-600 hover:text-white hover:shadow-md hover:shadow-blue-100"
                 >
                     <RotateCcw className="h-4 w-4" />
-                    Reset Filters
+                    {t("Reset Filters")}
                 </button>
             </div>
 
@@ -63,12 +66,12 @@ export function FilterPanel({
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100">
                             <Tags className="h-4 w-4" />
                         </span>
-                        Category
+                        {t("Category")}
                     </h3>
 
                     <div className="space-y-2">
                         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 transition hover:border-blue-200 hover:bg-blue-50/60 hover:text-blue-700">
-                            <span>All Categories</span>
+                            <span>{t("All Categories")}</span>
                             <input
                                 type="radio"
                                 name="category"
@@ -107,7 +110,7 @@ export function FilterPanel({
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100">
                             <DollarSign className="h-4 w-4" />
                         </span>
-                        Price
+                        {t("Price")}
                     </h3>
 
                     <div className="space-y-2">
@@ -123,7 +126,7 @@ export function FilterPanel({
                                         : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50/60 hover:text-blue-700"
                                 }`}
                             >
-                                <span>{option.label}</span>
+                                <span>{t(option.label)}</span>
                                 <input
                                     type="radio"
                                     name="price"
@@ -141,7 +144,7 @@ export function FilterPanel({
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600 ring-1 ring-blue-100">
                             <ArrowUpDown className="h-4 w-4" />
                         </span>
-                        Sorting
+                        {t("Sorting")}
                     </h3>
 
                     <div className="space-y-2">
@@ -158,7 +161,7 @@ export function FilterPanel({
                                         : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50/60 hover:text-blue-700"
                                 }`}
                             >
-                                <span>{option.label}</span>
+                                <span>{t(option.label)}</span>
                                 <input
                                     type="radio"
                                     name="sort"

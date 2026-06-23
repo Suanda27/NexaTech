@@ -19,7 +19,7 @@ import {
 type LanguageContextValue = {
     language: Language;
     setLanguage: (language: Language) => void;
-    t: (value: string) => string;
+    t: (value: string | null | undefined) => string;
 };
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(
@@ -53,7 +53,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const t = useCallback(
-        (value: string) => translateText(value, language),
+        (value: string | null | undefined) => translateText(value, language),
         [language],
     );
 

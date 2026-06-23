@@ -5,6 +5,7 @@ import { AuthProvider } from "../context/AuthContext";
 import { ShopProvider } from "../context/ShopContext";
 import { ToastProvider } from "../context/ToastContext";
 import { LanguageProvider } from "../context/LanguageContext";
+import LanguageSync from "./components/language/LanguageSync";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,9 @@ export default function RootLayout({
               <LanguageProvider>
                   <AuthProvider>
                       <ShopProvider>
-                          <ToastProvider>{children}</ToastProvider>
+                          <ToastProvider>
+                              <LanguageSync>{children}</LanguageSync>
+                          </ToastProvider>
                       </ShopProvider>
                   </AuthProvider>
               </LanguageProvider>

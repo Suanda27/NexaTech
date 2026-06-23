@@ -93,7 +93,7 @@ trait SerializesStoreData
             ->all();
     }
 
-    protected function serializeOrder(Order $order, bool $includePaymentProof = true): array
+    protected function serializeOrder(Order $order): array
     {
         $order->loadMissing('items');
 
@@ -114,8 +114,7 @@ trait SerializesStoreData
             'midtransPaymentType' => $order->midtrans_payment_type,
             'status' => $this->orderStatusLabel($order->status),
             'statusKey' => $order->status,
-            'declineReason' => $order->payment_rejection_reason ?? $order->cancellation_reason ?? $order->decline_reason,
-            'paymentRejectionReason' => $order->payment_rejection_reason,
+            'declineReason' => $order->cancellation_reason ?? $order->decline_reason,
             'cancellationReason' => $order->cancellation_reason,
             'customer' => [
                 'firstName' => $order->first_name,
@@ -137,19 +136,14 @@ trait SerializesStoreData
             'items' => $this->serializeOrderItems($order->items),
         ];
 
-        if ($includePaymentProof) {
-            $payload['paymentProofImage'] = $order->paymentProofUrl();
-        }
-
         return $payload;
     }
 
     protected function paymentMethodLabel(string $paymentMethod): string
     {
         return match ($paymentMethod) {
-            Order::PAYMENT_METHOD_BANK_TRANSFER => 'Bank Transfer',
             Order::PAYMENT_METHOD_MIDTRANS => 'Midtrans',
-            default => 'COD',
+            default => 'Midtrans',
         };
     }
 
@@ -157,10 +151,10 @@ trait SerializesStoreData
     {
         return match ($paymentStatus) {
             Order::PAYMENT_STATUS_WAITING_PAYMENT => 'Waiting Payment',
-            Order::PAYMENT_STATUS_WAITING_VERIFICATION => 'Waiting Verification',
-            Order::PAYMENT_STATUS_PAID => 'Paid',
-            Order::PAYMENT_STATUS_REJECTED => 'Rejected',
-            Order::PAYMENT_STATUS_EXPIRED => 'Expired',
+            Order::PAYMENT_STATUS_PROCESSING => 'Processing',
+            Order::PAYMENT_STATUS_SHIPPED => 'Shipped',
+            Order::PAYMENT_STATUS_COMPLETED => 'Completed',
+            Order::PAYMENT_STATUS_CANCELLED => 'Cancelled',
             default => 'Unpaid',
         };
     }
@@ -168,11 +162,12 @@ trait SerializesStoreData
     protected function orderStatusLabel(string $status): string
     {
         return match ($status) {
-            Order::STATUS_PENDING => 'Pending',
+            Order::STATUS_WAITING_PAYMENT => 'Waiting Payment',
             Order::STATUS_PROCESSING => 'Processing',
-            Order::STATUS_DELIVERED => 'Delivered',
+            Order::STATUS_SHIPPED => 'Shipped',
+            Order::STATUS_COMPLETED => 'Completed',
             Order::STATUS_CANCELLED => 'Cancelled',
-            default => 'Pending',
+            default => 'Waiting Payment',
         };
     }
 

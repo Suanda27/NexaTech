@@ -9,15 +9,16 @@ import {
     Sparkles,
 } from "lucide-react";
 import { useToast } from "@/context/ToastContext";
+import { useLanguage } from "@/context/LanguageContext";
 import OrderTable from "./OrderTable";
-import type { OrderItemData } from "./types";
+import type { OrderItemData, OrderStatus } from "./types";
 import {
     fetchAdminOrders,
     updateAdminOrder,
     type OrderData,
     type PaginationMeta,
 } from "@/lib/store";
-import { syncAdminVerificationNotifications } from "@/lib/order-notification";
+import { syncAdminOrderNotifications } from "@/lib/order-notification";
 
 function normalizeOrder(item: OrderData): OrderItemData {
     return {
@@ -33,9 +34,7 @@ function normalizeOrder(item: OrderData): OrderItemData {
         statusKey: item.statusKey as OrderItemData["statusKey"],
         status: item.status as OrderItemData["status"],
         declineReason: item.declineReason,
-        paymentRejectionReason: item.paymentRejectionReason,
         cancellationReason: item.cancellationReason,
-        paymentProofImage: item.paymentProofImage ?? null,
         customer: item.customer,
         items: item.items.map((orderItem) => ({
             id: orderItem.id,
@@ -47,8 +46,20 @@ function normalizeOrder(item: OrderData): OrderItemData {
     };
 }
 
+const adminStatusMap: Record<
+    OrderStatus,
+    "waiting_payment" | "processing" | "shipped" | "completed" | "cancelled"
+> = {
+    "Waiting Payment": "waiting_payment",
+    Processing: "processing",
+    Shipped: "shipped",
+    Completed: "completed",
+    Cancelled: "cancelled",
+};
+
 export default function OrderPage() {
     const { notify } = useToast();
+    const { t } = useLanguage();
     const [orders, setOrders] = useState<OrderItemData[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>({
         currentPage: 1,
@@ -57,9 +68,9 @@ export default function OrderPage() {
         total: 0,
     });
     const [summary, setSummary] = useState({
-        paidOrders: 0,
+        activeOrders: 0,
         totalOrders: 0,
-        deliveredOrders: 0,
+        completedOrders: 0,
         progressingOrders: 0,
         orderValue: 0,
     });
@@ -73,7 +84,7 @@ export default function OrderPage() {
                 q: searchQuery || null,
                 status: selectedStatus === "Semua Status"
                     ? null
-                    : selectedStatus.toLowerCase(),
+                    : selectedStatus,
                 page,
                 perPage: meta.perPage,
             });
@@ -86,20 +97,18 @@ export default function OrderPage() {
                 !searchQuery &&
                 selectedStatus === "Semua Status"
             ) {
-                const verificationToast = syncAdminVerificationNotifications(
-                    response.data,
-                );
+                const orderToast = syncAdminOrderNotifications();
 
-                if (verificationToast) {
-                    notify(verificationToast);
+                if (orderToast) {
+                    notify(orderToast);
                 }
             }
         } catch {
             setOrders([]);
             setSummary({
-                paidOrders: 0,
+                activeOrders: 0,
                 totalOrders: 0,
-                deliveredOrders: 0,
+                completedOrders: 0,
                 progressingOrders: 0,
                 orderValue: 0,
             });
@@ -121,7 +130,7 @@ export default function OrderPage() {
                     q: searchQuery || null,
                     status: selectedStatus === "Semua Status"
                         ? null
-                        : selectedStatus.toLowerCase(),
+                        : selectedStatus,
                     page: currentPage,
                     perPage: meta.perPage,
                 });
@@ -138,12 +147,10 @@ export default function OrderPage() {
                     !searchQuery &&
                     selectedStatus === "Semua Status"
                 ) {
-                    const verificationToast = syncAdminVerificationNotifications(
-                        response.data,
-                    );
+                    const orderToast = syncAdminOrderNotifications();
 
-                    if (verificationToast) {
-                        notify(verificationToast);
+                    if (orderToast) {
+                        notify(orderToast);
                     }
                 }
             } catch {
@@ -153,9 +160,9 @@ export default function OrderPage() {
 
                 setOrders([]);
                 setSummary({
-                    paidOrders: 0,
+                    activeOrders: 0,
                     totalOrders: 0,
-                    deliveredOrders: 0,
+                    completedOrders: 0,
                     progressingOrders: 0,
                     orderValue: 0,
                 });
@@ -175,10 +182,6 @@ export default function OrderPage() {
         };
     }, [currentPage, meta.perPage, notify, searchQuery, selectedStatus]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery, selectedStatus]);
-
     const handleUpdateOrder = async (
         orderId: string,
         updates: Partial<
@@ -187,7 +190,6 @@ export default function OrderPage() {
                 | "status"
                 | "paymentStatus"
                 | "declineReason"
-                | "paymentRejectionReason"
                 | "cancellationReason"
             >
         >,
@@ -197,41 +199,27 @@ export default function OrderPage() {
         }
 
         const statusKey = updates.status
-            ? {
-                  Pending: "pending",
-                  Processing: "processing",
-                  Delivered: "delivered",
-                  Cancelled: "cancelled",
-              }[updates.status]
-            : undefined;
-        const paymentStatusKey = updates.paymentStatus
-            ? {
-                  Paid: "paid",
-                  Rejected: "rejected",
-              }[updates.paymentStatus]
+            ? adminStatusMap[updates.status]
             : undefined;
 
         try {
             const response = await updateAdminOrder(orderId, {
-                status: statusKey,
-                payment_status: paymentStatusKey,
-                payment_rejection_reason: updates.paymentRejectionReason ?? null,
-                cancellation_reason: updates.cancellationReason ?? null,
+                status: statusKey === "shipped" ? statusKey : undefined,
             });
             await loadOrders(currentPage);
             notify({
                 tone: "success",
-                title: "Order berhasil diperbarui",
-                message: response.message,
+                title: t("Order updated successfully"),
+                message: t(response.message),
             });
         } catch (error) {
             notify({
                 tone: "error",
-                title: "Gagal memperbarui order",
+                title: t("Failed to update order"),
                 message:
                     error instanceof Error
-                        ? error.message
-                        : "Gagal memperbarui order.",
+                        ? t(error.message)
+                        : t("Failed to update order."),
             });
         }
     };
@@ -243,23 +231,20 @@ export default function OrderPage() {
                     <div className="space-y-5">
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
                             <Sparkles className="h-3.5 w-3.5" />
-                            Refined order management
+                            {t("Refined order management")}
                         </div>
 
                         <div className="space-y-3">
                             <div>
                                 <p className="text-sm font-medium text-slate-500">
-                                    Sales operation
+                                    {t("Sales operation")}
                                 </p>
                                 <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                    Manajemen Order
+                                    {t("Order Management")}
                                 </h1>
                             </div>
                             <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                                Semua order sekarang dibaca langsung dari database
-                                dengan ringkasan yang lebih ringan, lalu detail
-                                bukti pembayaran diambil saat admin membuka modal
-                                order.
+                                {t("Orders now follow a single status flow from waiting payment to processing, shipped, completed, or cancelled.")}
                             </p>
                         </div>
                     </div>
@@ -269,10 +254,10 @@ export default function OrderPage() {
                             <div className="flex items-center justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                        Paid Orders
+                                        {t("Active Orders")}
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold text-slate-950">
-                                        {summary.paidOrders}
+                                        {summary.activeOrders}
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -285,10 +270,10 @@ export default function OrderPage() {
                             <div className="flex items-center justify-between gap-3">
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
-                                        Order Summary
+                                        {t("Order Summary")}
                                     </p>
                                     <p className="mt-1 text-2xl font-semibold">
-                                        {summary.totalOrders} orders
+                                        {summary.totalOrders} {t("orders")}
                                     </p>
                                 </div>
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-blue-200">
@@ -296,8 +281,8 @@ export default function OrderPage() {
                                 </div>
                             </div>
                             <p className="mt-3 text-xs text-slate-300">
-                                {summary.progressingOrders} pending/processing,{" "}
-                                {summary.deliveredOrders} delivered
+                                {summary.progressingOrders} {t("waiting payment/processing/shipped")},{" "}
+                                {summary.completedOrders} {t("completed")}
                             </p>
                         </div>
                     </div>
@@ -314,7 +299,7 @@ export default function OrderPage() {
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                        Total Value
+                                        {t("Total Value")}
                                     </p>
                                     <p className="mt-1 text-lg font-semibold text-slate-950">
                                         Rp {summary.orderValue.toLocaleString("id-ID")}
@@ -325,16 +310,16 @@ export default function OrderPage() {
 
                         <div className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
                             <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                Delivered
+                                {t("Completed")}
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">
-                                {summary.deliveredOrders}
+                                {summary.completedOrders}
                             </p>
                         </div>
 
                         <div className="rounded-lg border border-blue-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
                             <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-                                Pending / Processing
+                                {t("Waiting / Processing / Shipped")}
                             </p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">
                                 {summary.progressingOrders}
@@ -348,26 +333,29 @@ export default function OrderPage() {
                             <input
                                 type="text"
                                 value={searchQuery}
-                                onChange={(event) =>
-                                    setSearchQuery(event.target.value)
-                                }
-                                placeholder="Cari ID order atau nama customer..."
+                                onChange={(event) => {
+                                    setSearchQuery(event.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder={t("Search order ID or customer name...")}
                                 className="h-full w-full bg-transparent pl-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
                             />
                         </div>
 
                         <select
                             value={selectedStatus}
-                            onChange={(event) =>
-                                setSelectedStatus(event.target.value)
-                            }
+                            onChange={(event) => {
+                                setSelectedStatus(event.target.value);
+                                setCurrentPage(1);
+                            }}
                             className="h-12 rounded-lg border border-blue-100 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         >
-                            <option value="Semua Status">Semua Status</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Processing">Processing</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
+                            <option value="Semua Status">{t("All Statuses")}</option>
+                            <option value="waiting_payment">{t("Waiting Payment")}</option>
+                            <option value="processing">{t("Processing")}</option>
+                            <option value="shipped">{t("Shipped")}</option>
+                            <option value="completed">{t("Completed")}</option>
+                            <option value="cancelled">{t("Cancelled")}</option>
                         </select>
                     </div>
                 </div>
@@ -379,7 +367,7 @@ export default function OrderPage() {
 
                 <div className="mt-4 flex flex-col gap-3 border-t border-blue-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                     <p>
-                        Menampilkan {orders.length} order dari total {meta.total} data.
+                        {t("Showing")} {orders.length} {t("orders")} {t("from total")} {meta.total} {t("data entries")}.
                     </p>
                     <div className="flex items-center gap-2 self-start sm:self-auto">
                         <button
@@ -388,10 +376,10 @@ export default function OrderPage() {
                             disabled={meta.currentPage <= 1}
                             className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Sebelumnya
+                            {t("Previous")}
                         </button>
                         <span className="rounded-lg bg-blue-50 px-3 py-2 font-medium text-blue-700">
-                            Halaman {meta.currentPage} / {meta.lastPage}
+                            {t("Page")} {meta.currentPage} / {meta.lastPage}
                         </span>
                         <button
                             type="button"
@@ -403,7 +391,7 @@ export default function OrderPage() {
                             disabled={meta.currentPage >= meta.lastPage}
                             className="rounded-lg border border-blue-100 bg-white px-3 py-2 font-medium text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Berikutnya
+                            {t("Next")}
                         </button>
                     </div>
                 </div>

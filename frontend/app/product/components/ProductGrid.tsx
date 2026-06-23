@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import type { ApiProduct, PaginatedProductsResponse } from "@/lib/store";
 import { ProductCard } from "./ProductCard";
+import { useLanguage } from "@/context/LanguageContext";
 
 type ProductGridProps = {
     products: ApiProduct[];
@@ -19,6 +20,7 @@ export function ProductGrid({
     onPageChange,
     onAddToCart,
 }: ProductGridProps) {
+    const { t } = useLanguage();
     const currentPage = meta?.currentPage ?? 1;
     const totalPages = meta?.lastPage ?? 1;
 
@@ -27,16 +29,16 @@ export function ProductGrid({
             <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p className="text-sm font-semibold text-blue-600">
-                        Product Collection
+                        {t("Product Collection")}
                     </p>
                     <h1 className="text-2xl font-bold text-gray-950">
-                        Explore Products
+                        {t("Explore Products")}
                     </h1>
                 </div>
                 <p className="text-sm text-gray-500">
                     {isLoading
-                        ? "Loading catalog..."
-                        : `${meta?.total ?? 0} products found`}
+                        ? t("Loading catalog...")
+                        : t(`${meta?.total ?? 0} products found`)}
                 </p>
             </div>
 
@@ -55,12 +57,10 @@ export function ProductGrid({
                         <ShoppingBag className="h-6 w-6" />
                     </div>
                     <h3 className="mt-5 text-xl font-semibold text-slate-950">
-                        Belum ada produk yang cocok
+                        {t("No matching products yet")}
                     </h3>
                     <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                        Coba ganti kategori, price, atau sorting. Kalau database
-                        masih kosong, produk akan muncul setelah ditambahkan dari
-                        admin.
+                        {t("Try changing category, price, or sorting. If the database is still empty, products will appear after being added from admin.")}
                     </p>
                 </div>
             ) : (

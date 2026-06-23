@@ -21,88 +21,14 @@ import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
 import AuthGuard from "@/app/components/auth/AuthGuard";
 import {
-    cancelPendingMidtransOrder,
     createOrder,
-    fetchMidtransConfig,
     fetchCart,
     fetchProfile,
+    syncMidtransOrder,
     type CartResponse,
 } from "@/lib/store";
 import { queueFlashToast } from "@/lib/toast";
-
-type MidtransSnapResult = {
-    order_id?: string;
-    payment_type?: string;
-    transaction_status?: string;
-    status_code?: string;
-};
-
-type MidtransSnap = {
-    pay: (
-        token: string,
-        callbacks: {
-            onSuccess?: (result: MidtransSnapResult) => void;
-            onPending?: (result: MidtransSnapResult) => void;
-            onError?: (result: MidtransSnapResult) => void;
-            onClose?: () => void;
-        },
-    ) => void;
-};
-
-declare global {
-    interface Window {
-        snap?: MidtransSnap;
-        midtransSnapScriptPromise?: Promise<void>;
-    }
-}
-
-async function loadMidtransSnap() {
-    if (typeof window === "undefined") {
-        throw new Error("Popup pembayaran hanya bisa dibuka di browser.");
-    }
-
-    if (window.snap) {
-        return;
-    }
-
-    if (window.midtransSnapScriptPromise) {
-        return window.midtransSnapScriptPromise;
-    }
-
-    window.midtransSnapScriptPromise = fetchMidtransConfig().then(({ data }) => {
-        if (!data.clientKey) {
-            throw new Error("MIDTRANS_CLIENT_KEY belum dikonfigurasi.");
-        }
-
-        return new Promise<void>((resolve, reject) => {
-            const existingScript = document.getElementById("midtrans-snap-script");
-
-            if (existingScript) {
-                existingScript.addEventListener("load", () => resolve(), {
-                    once: true,
-                });
-                existingScript.addEventListener(
-                    "error",
-                    () => reject(new Error("Gagal memuat popup pembayaran Midtrans.")),
-                    { once: true },
-                );
-                return;
-            }
-
-            const script = document.createElement("script");
-            script.id = "midtrans-snap-script";
-            script.src = data.snapUrl;
-            script.async = true;
-            script.dataset.clientKey = data.clientKey;
-            script.onload = () => resolve();
-            script.onerror = () =>
-                reject(new Error("Gagal memuat popup pembayaran Midtrans."));
-            document.body.appendChild(script);
-        });
-    });
-
-    return window.midtransSnapScriptPromise;
-}
+import { loadMidtransSnap } from "@/lib/midtrans";
 
 export default function CheckoutPage() {
     const router = useRouter();
@@ -199,12 +125,6 @@ export default function CheckoutPage() {
                 postal_code: form.postalCode,
                 payment_method: payment,
             });
-            const restoreCancelledMidtransOrder = async () => {
-                await cancelPendingMidtransOrder(response.data.id);
-                const restoredCart = await fetchCart();
-                setCart(restoredCart);
-                await refreshCartCount();
-            };
 
             if (
                 response.data.paymentMethodKey === "midtrans" &&
@@ -232,9 +152,9 @@ export default function CheckoutPage() {
 
                 await refreshCartCount();
 
-                await new Promise<void>((resolve, reject) => {
+                await new Promise<void>((resolve) => {
                     let isOrderFinalized = false;
-                    const cancelOrderAndRestore = async (
+                    const finishCheckout = (
                         title: string,
                         message: string,
                     ) => {
@@ -243,81 +163,68 @@ export default function CheckoutPage() {
                         }
 
                         isOrderFinalized = true;
-                        await restoreCancelledMidtransOrder();
-                        notify({
-                            tone: "error",
+                        queueFlashToast({
+                            tone: "success",
                             title,
                             message,
+                            durationMs: 5200,
                         });
+                        router.push("/profile?tab=orders");
+                        resolve();
+                    };
+                    const keepOrderWaitingPayment = (
+                        title: string,
+                        message: string,
+                    ) => {
+                        if (isOrderFinalized) {
+                            return;
+                        }
+
+                        isOrderFinalized = true;
+                        queueFlashToast({
+                            tone: "warning",
+                            title,
+                            message,
+                            durationMs: 5200,
+                        });
+                        router.push("/profile?tab=orders");
+                        resolve();
                     };
 
                     window.snap?.pay(response.data.midtransSnapToken ?? "", {
                         onSuccess: () => {
-                            if (isOrderFinalized) {
-                                return;
-                            }
-
-                            isOrderFinalized = true;
-                            queueFlashToast({
-                                tone: "success",
-                                title: "Pembayaran berhasil",
-                                message:
-                                    "Pembayaran Midtrans selesai. Status order akan diperbarui otomatis.",
-                                durationMs: 5200,
-                            });
-                            router.push("/profile?tab=orders");
-                            resolve();
+                            void (async () => {
+                                try {
+                                    await syncMidtransOrder(response.data.id);
+                                    finishCheckout(
+                                        "Pembayaran berhasil",
+                                        "Pembayaran Midtrans selesai dan status order sudah disinkronkan.",
+                                    );
+                                } catch {
+                                    finishCheckout(
+                                        "Pembayaran berhasil",
+                                        "Pembayaran Midtrans selesai. Status order akan diperbarui otomatis.",
+                                    );
+                                }
+                            })();
                         },
                         onPending: () => {
-                            void (async () => {
-                                try {
-                                    await cancelOrderAndRestore(
-                                        "Pembayaran belum selesai",
-                                        "Metode pembayaran sudah dipilih, tetapi transaksi belum dibayar. Order dibatalkan dan item dikembalikan ke cart.",
-                                    );
-                                    resolve();
-                                } catch (cancelError) {
-                                    reject(
-                                        cancelError instanceof Error
-                                            ? cancelError
-                                            : new Error("Gagal membatalkan order Midtrans."),
-                                    );
-                                }
-                            })();
+                            keepOrderWaitingPayment(
+                                "Pembayaran belum selesai",
+                                "Order tetap menunggu pembayaran Midtrans. Selesaikan pembayaran agar status diperbarui otomatis.",
+                            );
                         },
                         onError: () => {
-                            void (async () => {
-                                try {
-                                    await cancelOrderAndRestore(
-                                        "Pembayaran dibatalkan",
-                                        "Pembayaran Midtrans gagal diproses. Order dibatalkan dan item dikembalikan ke cart.",
-                                    );
-                                    resolve();
-                                } catch (cancelError) {
-                                    reject(
-                                        cancelError instanceof Error
-                                            ? cancelError
-                                            : new Error("Pembayaran Midtrans gagal diproses."),
-                                    );
-                                }
-                            })();
+                            keepOrderWaitingPayment(
+                                "Pembayaran belum selesai",
+                                "Pembayaran Midtrans gagal diproses. Order tetap menunggu pembayaran dan bisa dicoba lagi sebelum deadline.",
+                            );
                         },
                         onClose: () => {
-                            void (async () => {
-                                try {
-                                    await cancelOrderAndRestore(
-                                        "Pembayaran dibatalkan",
-                                        "Popup Midtrans ditutup. Order tidak dilanjutkan dan item sudah kembali ke cart.",
-                                    );
-                                    resolve();
-                                } catch (cancelError) {
-                                    reject(
-                                        cancelError instanceof Error
-                                            ? cancelError
-                                            : new Error("Gagal membatalkan order Midtrans."),
-                                    );
-                                }
-                            })();
+                            keepOrderWaitingPayment(
+                                "Pembayaran belum selesai",
+                                "Popup Midtrans ditutup. Order tetap menunggu pembayaran dan VA/QRIS yang sudah dibuat masih bisa dibayar.",
+                            );
                         },
                     });
                 });

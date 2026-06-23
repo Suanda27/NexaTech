@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->string('midtrans_order_id')->nullable()->after('payment_proof');
+            $table->string('midtrans_order_id')->nullable()->after('decline_reason');
             $table->string('midtrans_snap_token')->nullable()->after('midtrans_order_id');
             $table->text('midtrans_redirect_url')->nullable()->after('midtrans_snap_token');
             $table->string('midtrans_transaction_status')->nullable()->after('midtrans_redirect_url');

@@ -16,7 +16,7 @@ const features: Feature[] = [
         icon: Truck,
         title: "Fast Delivery",
         description:
-            "Lightning-fast shipping to get your tech products delivered when you need them most.",
+            "Lightning-fast shipping so your tech products arrive when you need them most.",
     },
     {
         icon: Award,

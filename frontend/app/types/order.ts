@@ -1,4 +1,4 @@
-export type OrderStatus = "Processing" | "Delivered" | "Declined" | "Cancelled";
+export type OrderStatus = "Waiting Payment" | "Processing" | "Shipped" | "Completed" | "Cancelled";
 
 export interface OrderItem {
     name: string;
@@ -10,10 +10,10 @@ export interface OrderItem {
 export interface OrderType {
     id: string;
     status: OrderStatus;
-    method: "bank" | "cod";
+    method: "midtrans";
     date: string;
     total: number;
-    isPaid: boolean;
+    isProcessing: boolean;
     declineReason?: string;
     items: OrderItem[];
 }

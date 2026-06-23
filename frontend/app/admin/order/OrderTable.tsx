@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import OrderDetailModal from "./components/OrderDetailModal";
 import type { OrderItemData } from "./types";
+import { useLanguage } from "@/context/LanguageContext";
 import {
     formatPrice,
     getPaymentMethodClasses,
@@ -25,7 +26,6 @@ type OrderTableProps = {
                 | "status"
                 | "paymentStatus"
                 | "declineReason"
-                | "paymentRejectionReason"
                 | "cancellationReason"
             >
         >,
@@ -36,6 +36,7 @@ export default function OrderTable({
     orders,
     onUpdateOrder,
 }: OrderTableProps) {
+    const { t } = useLanguage();
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
     const selectedOrder = useMemo(
@@ -50,11 +51,10 @@ export default function OrderTable({
         return (
             <div className="rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-16 text-center">
                 <h3 className="text-xl font-semibold text-slate-950">
-                    Belum ada order
+                    {t("No orders yet")}
                 </h3>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                    Pesanan customer akan muncul di sini setelah transaksi mulai
-                    masuk ke sistem.
+                    {t("Customer orders will appear here after transactions start entering the system.")}
                 </p>
             </div>
         );
@@ -67,14 +67,14 @@ export default function OrderTable({
                     <table className="min-w-[980px] w-full text-sm">
                         <thead className="bg-blue-50">
                             <tr className="text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                <th className="px-6 py-4">ID Order</th>
-                                <th className="px-6 py-4">Nama Customer</th>
-                                <th className="px-6 py-4">Tanggal Pemesan</th>
-                                <th className="px-6 py-4">Metode Pembayaran</th>
-                                <th className="px-6 py-4">Payment Status</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4">Total</th>
-                                <th className="px-6 py-4">Aksi</th>
+                                <th className="px-6 py-4">{t("Order ID")}</th>
+                                <th className="px-6 py-4">{t("Customer Name")}</th>
+                                <th className="px-6 py-4">{t("Order Date")}</th>
+                                <th className="px-6 py-4">{t("Payment Method")}</th>
+                                <th className="px-6 py-4">{t("Payment Status")}</th>
+                                <th className="px-6 py-4">{t("Status")}</th>
+                                <th className="px-6 py-4">{t("Total")}</th>
+                                <th className="px-6 py-4">{t("Actions")}</th>
                             </tr>
                         </thead>
 
@@ -106,7 +106,7 @@ export default function OrderTable({
                                                 order.paymentMethod,
                                             )}`}
                                         >
-                                            {order.paymentMethod}
+                                            {t(order.paymentMethod)}
                                         </span>
                                     </td>
 
@@ -116,7 +116,7 @@ export default function OrderTable({
                                                 order.paymentStatus,
                                             )}`}
                                         >
-                                            {getPaymentStatusLabel(order.paymentStatusKey)}
+                                            {t(getPaymentStatusLabel(order.paymentStatusKey))}
                                         </span>
                                     </td>
 
@@ -127,7 +127,7 @@ export default function OrderTable({
                                             )}`}
                                         >
                                             <span className="h-2 w-2 rounded-full bg-current" />
-                                            {getOrderStatusLabel(order.statusKey)}
+                                            {t(getOrderStatusLabel(order.statusKey))}
                                         </span>
                                     </td>
 
@@ -149,7 +149,7 @@ export default function OrderTable({
                                             className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
                                         >
                                             <Eye className="h-3.5 w-3.5" />
-                                            Detail
+                                            {t("Details")}
                                         </button>
                                     </td>
                                 </tr>
@@ -160,7 +160,7 @@ export default function OrderTable({
             </div>
 
             <OrderDetailModal
-                key={`${selectedOrder?.id ?? "empty"}-${selectedOrder?.paymentStatus ?? ""}-${selectedOrder?.status ?? ""}-${selectedOrder?.paymentRejectionReason ?? ""}-${selectedOrder?.cancellationReason ?? ""}`}
+                key={`${selectedOrder?.id ?? "empty"}-${selectedOrder?.paymentStatus ?? ""}-${selectedOrder?.status ?? ""}-${selectedOrder?.cancellationReason ?? ""}`}
                 isOpen={Boolean(selectedOrder)}
                 order={selectedOrder}
                 onClose={() => setSelectedOrderId(null)}

@@ -22,13 +22,13 @@ class AdminOrderController extends Controller
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:pending,processing,delivered,cancelled'],
-            'payment_status' => ['nullable', 'in:waiting_payment,waiting_verification,paid,rejected,expired,unpaid'],
+            'status' => ['nullable', 'in:waiting_payment,processing,shipped,completed,cancelled'],
+            'payment_status' => ['nullable', 'in:waiting_payment,processing,shipped,completed,cancelled'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
         ]);
 
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
 
         $summaryQuery = Order::query();
         $ordersQuery = Order::query()
@@ -49,7 +49,6 @@ class AdminOrderController extends Controller
                 'midtrans_redirect_url',
                 'midtrans_transaction_status',
                 'midtrans_payment_type',
-                'payment_rejection_reason',
                 'cancellation_reason',
                 'decline_reason',
                 'subtotal',
@@ -92,25 +91,25 @@ class AdminOrderController extends Controller
         $summary = $summaryQuery
             ->selectRaw('COUNT(*) as total_orders')
             ->selectRaw(
-                "SUM(CASE WHEN payment_status = '".Order::PAYMENT_STATUS_PAID."' THEN 1 ELSE 0 END) as paid_orders"
+                "SUM(CASE WHEN status IN ('".Order::STATUS_PROCESSING."', '".Order::STATUS_SHIPPED."', '".Order::STATUS_COMPLETED."') THEN 1 ELSE 0 END) as active_orders"
             )
             ->selectRaw(
-                "SUM(CASE WHEN status = '".Order::STATUS_DELIVERED."' THEN 1 ELSE 0 END) as delivered_orders"
+                "SUM(CASE WHEN status = '".Order::STATUS_COMPLETED."' THEN 1 ELSE 0 END) as completed_orders"
             )
             ->selectRaw(
-                "SUM(CASE WHEN status IN ('".Order::STATUS_PENDING."', '".Order::STATUS_PROCESSING."') THEN 1 ELSE 0 END) as progressing_orders"
+                "SUM(CASE WHEN status IN ('".Order::STATUS_WAITING_PAYMENT."', '".Order::STATUS_PROCESSING."', '".Order::STATUS_SHIPPED."') THEN 1 ELSE 0 END) as progressing_orders"
             )
             ->selectRaw('COALESCE(SUM(total), 0) as order_value')
             ->first();
 
         return response()->json([
             'data' => $orders->getCollection()
-                ->map(fn (Order $order) => $this->serializeOrder($order, false))
+                ->map(fn (Order $order) => $this->serializeOrder($order))
                 ->values(),
             'summary' => [
-                'paidOrders' => (int) ($summary->paid_orders ?? 0),
+                'activeOrders' => (int) ($summary->active_orders ?? 0),
                 'totalOrders' => (int) ($summary->total_orders ?? 0),
-                'deliveredOrders' => (int) ($summary->delivered_orders ?? 0),
+                'completedOrders' => (int) ($summary->completed_orders ?? 0),
                 'progressingOrders' => (int) ($summary->progressing_orders ?? 0),
                 'orderValue' => (int) ($summary->order_value ?? 0),
             ],
@@ -125,7 +124,7 @@ class AdminOrderController extends Controller
 
     public function show(Order $order)
     {
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
 
         return response()->json([
             'data' => $this->serializeOrder($order->fresh()->load('items')),
@@ -135,13 +134,10 @@ class AdminOrderController extends Controller
     public function update(Request $request, Order $order)
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'in:pending,processing,delivered,cancelled'],
-            'payment_status' => ['nullable', 'in:paid,rejected'],
-            'payment_rejection_reason' => ['nullable', 'string'],
-            'cancellation_reason' => ['nullable', 'string'],
+            'status' => ['nullable', 'in:shipped'],
         ]);
 
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
         $order->refresh();
 
         try {

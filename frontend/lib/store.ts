@@ -1,6 +1,6 @@
 "use client";
 
-import { authFetch, fetchJson } from "@/lib/auth";
+import { fetchJson } from "@/lib/auth";
 import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
 
 export type ApiCategory = {
@@ -86,7 +86,7 @@ export type OrderData = {
     paymentDeadline: string | null;
     paymentExpiresAt: string | null;
     paymentMethod: string;
-    paymentMethodKey: "bank_transfer" | "cod" | "midtrans";
+    paymentMethodKey: "midtrans";
     paymentStatus: string;
     paymentStatusKey: PaymentStatusKey;
     midtransSnapToken: string | null;
@@ -96,9 +96,7 @@ export type OrderData = {
     status: string;
     statusKey: OrderStatusKey;
     declineReason: string | null;
-    paymentRejectionReason: string | null;
     cancellationReason: string | null;
-    paymentProofImage?: string | null;
     customer: {
         firstName: string;
         lastName: string;
@@ -148,7 +146,7 @@ export type ProfileResponse = {
         summary: {
             totalOrders: number;
             progressingOrders: number;
-            deliveredOrders: number;
+            completedOrders: number;
             declinedOrders: number;
             cancelledOrders: number;
         };
@@ -330,7 +328,7 @@ export function createOrder(payload: {
     address: string;
     city: string;
     postal_code: string;
-    payment_method: "bank_transfer" | "cod" | "midtrans";
+    payment_method: "midtrans";
 }) {
     return sendJson<{ message: string; data: OrderData }>("/api/orders", {
         method: "POST",
@@ -338,44 +336,22 @@ export function createOrder(payload: {
     });
 }
 
-export function cancelPendingMidtransOrder(orderId: string) {
+export function completeOrder(orderId: string) {
     return sendJson<{ message: string; data: OrderData }>(
-        `/api/orders/${orderId}/midtrans-cancel`,
+        `/api/orders/${orderId}/complete`,
         {
             method: "POST",
         },
     );
 }
 
-export function uploadOrderPaymentProof(
-    orderId: string,
-    payload: {
-        payment_proof: File;
-    },
-): Promise<{ message: string; data: OrderData }> {
-    const formData = new FormData();
-    formData.append("payment_proof", payload.payment_proof);
-
-    return authFetch(`/api/orders/${orderId}/payment-proof`, {
-        method: "POST",
-        body: formData,
-    }).then(async (response) => {
-        const data = (await response.json()) as {
-            message?: string;
-            errors?: Record<string, string[]>;
-            data: OrderData;
-        };
-
-        if (!response.ok) {
-            throw new Error(
-                data.message ??
-                    Object.values(data.errors ?? {})[0]?.[0] ??
-                    "Gagal mengupload bukti pembayaran",
-            );
-        }
-
-        return data as { message: string; data: OrderData };
-    });
+export function syncMidtransOrder(orderId: string) {
+    return sendJson<{ message: string; data: OrderData }>(
+        `/api/orders/${orderId}/sync-midtrans`,
+        {
+            method: "POST",
+        },
+    );
 }
 
 export function fetchAdminDashboard() {
@@ -541,9 +517,9 @@ export function fetchAdminOrders(params?: {
     return fetchJson<{
         data: OrderData[];
         summary: {
-            paidOrders: number;
+            activeOrders: number;
             totalOrders: number;
-            deliveredOrders: number;
+            completedOrders: number;
             progressingOrders: number;
             orderValue: number;
         };
@@ -566,10 +542,7 @@ export function fetchAdminOrderDetail(orderId: string) {
 export function updateAdminOrder(
     orderId: string,
     payload: {
-        status?: "pending" | "processing" | "delivered" | "cancelled";
-        payment_status?: "paid" | "rejected";
-        payment_rejection_reason?: string | null;
-        cancellation_reason?: string | null;
+        status?: "shipped";
     },
 ) {
     return sendJson<{ message: string; data: OrderData }>(

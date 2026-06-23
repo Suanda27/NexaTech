@@ -7,16 +7,14 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class OrderPaymentFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_cod_is_rejected_when_total_exceeds_threshold(): void
+    public function test_invalid_payment_method_is_rejected(): void
     {
         $user = $this->createCustomerUser();
 
@@ -30,13 +28,13 @@ class OrderPaymentFlowTest extends TestCase
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_COD,
+                'payment_method' => 'cod',
             ]))
             ->assertStatus(422)
-            ->assertJsonPath('message', 'COD hanya tersedia untuk total belanja maksimal Rp 300.000.');
+            ->assertJsonPath('errors.payment_method.0', 'The selected payment method is invalid.');
     }
 
-    public function test_transfer_order_starts_as_waiting_payment_with_deadline(): void
+    public function test_midtrans_order_starts_as_waiting_payment_with_deadline(): void
     {
         $user = $this->createCustomerUser();
 
@@ -50,20 +48,20 @@ class OrderPaymentFlowTest extends TestCase
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]));
 
         $response
             ->assertCreated()
             ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_WAITING_PAYMENT)
-            ->assertJsonPath('data.statusKey', Order::STATUS_PENDING);
+            ->assertJsonPath('data.statusKey', Order::STATUS_WAITING_PAYMENT);
 
         $this->assertNotNull($response->json('data.paymentDeadline'));
         $this->assertDatabaseHas('orders', [
             'user_id' => $user->id,
-            'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             'payment_status' => Order::PAYMENT_STATUS_WAITING_PAYMENT,
-            'status' => Order::STATUS_PENDING,
+            'status' => Order::STATUS_WAITING_PAYMENT,
         ]);
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
@@ -143,7 +141,29 @@ class OrderPaymentFlowTest extends TestCase
         ]);
     }
 
-    public function test_midtrans_settlement_notification_marks_order_as_paid(): void
+    public function test_midtrans_checkout_rejects_sandbox_key_in_production_mode(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+        config()->set('services.midtrans.is_production', true);
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Mode Midtrans production aktif, tetapi Server Key yang dipakai masih sandbox. Gunakan production key atau ubah MIDTRANS_IS_PRODUCTION=false.');
+    }
+
+    public function test_midtrans_settlement_notification_moves_order_to_processing(): void
     {
         config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
 
@@ -158,7 +178,7 @@ class OrderPaymentFlowTest extends TestCase
 
         $order = $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]));
 
         $orderId = (string) $order->json('data.id');
@@ -177,95 +197,127 @@ class OrderPaymentFlowTest extends TestCase
             'gross_amount' => $grossAmount,
             'signature_key' => hash('sha512', $midtransOrderId.'200'.$grossAmount.'SB-Mid-server-test'),
             'transaction_status' => 'settlement',
-            'payment_type' => 'bank_transfer',
+            'payment_type' => 'qris',
         ])->assertOk();
 
         $this->assertDatabaseHas('orders', [
             'id' => $orderId,
             'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
-            'payment_status' => Order::PAYMENT_STATUS_PAID,
+            'payment_status' => Order::PAYMENT_STATUS_PROCESSING,
+            'status' => Order::STATUS_PROCESSING,
+            'midtrans_transaction_status' => 'settlement',
+            'midtrans_payment_type' => 'qris',
+        ]);
+    }
+
+    public function test_midtrans_settlement_notification_works_without_api_prefix(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $orderId = (string) $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->json('data.id');
+
+        $midtransOrderId = 'NEXA-'.$orderId.'-WEBHOOK';
+        Order::query()->whereKey($orderId)->update([
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'midtrans_order_id' => $midtransOrderId,
+        ]);
+
+        $grossAmount = '450000.00';
+
+        $this->postJson('/payments/midtrans/notification', [
+            'order_id' => $midtransOrderId,
+            'status_code' => '200',
+            'gross_amount' => $grossAmount,
+            'signature_key' => hash('sha512', $midtransOrderId.'200'.$grossAmount.'SB-Mid-server-test'),
+            'transaction_status' => 'settlement',
+            'payment_type' => 'qris',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'payment_status' => Order::PAYMENT_STATUS_PROCESSING,
+            'status' => Order::STATUS_PROCESSING,
+        ]);
+    }
+
+    public function test_customer_can_sync_midtrans_status_after_snap_success(): void
+    {
+        config()->set('services.midtrans.server_key', 'Mid-server-test');
+        config()->set('services.midtrans.is_production', false);
+
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        Http::fake([
+            'app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-sync-test',
+                'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-sync-test',
+            ]),
+        ]);
+
+        $orderId = (string) $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->json('data.id');
+
+        $midtransOrderId = 'NEXA-'.$orderId.'-SYNC';
+        Order::query()->whereKey($orderId)->update([
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'midtrans_order_id' => $midtransOrderId,
+        ]);
+
+        Http::fake([
+            'app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-sync-test',
+                'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-sync-test',
+            ]),
+            "api.sandbox.midtrans.com/v2/{$midtransOrderId}/status" => Http::response([
+                'order_id' => $midtransOrderId,
+                'status_code' => '200',
+                'gross_amount' => '450000.00',
+                'transaction_status' => 'settlement',
+                'payment_type' => 'bank_transfer',
+                'fraud_status' => 'accept',
+            ]),
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/orders/{$orderId}/sync-midtrans")
+            ->assertOk()
+            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_PROCESSING)
+            ->assertJsonPath('data.statusKey', Order::STATUS_PROCESSING);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'payment_status' => Order::PAYMENT_STATUS_PROCESSING,
             'status' => Order::STATUS_PROCESSING,
             'midtrans_transaction_status' => 'settlement',
             'midtrans_payment_type' => 'bank_transfer',
         ]);
     }
 
-    public function test_customer_can_submit_payment_proof_after_checkout(): void
+    public function test_admin_can_ship_processing_order(): void
     {
-        Storage::fake(Order::PAYMENT_PROOF_DISK);
-
-        $user = $this->createCustomerUser();
-
-        $product = $this->createProduct(price: 450000);
-
-        CartItem::query()->create([
-            'user_id' => $user->id,
-            'product_id' => $product->id,
-            'quantity' => 1,
-        ]);
-
-        $orderId = (string) $this->actingAs($user, 'sanctum')
-            ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
-            ]))
-            ->json('data.id');
-
-        $this->actingAs($user, 'sanctum')
-            ->post("/api/orders/{$orderId}/payment-proof", [
-                'payment_proof' => UploadedFile::fake()->image('payment-proof.png'),
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_WAITING_VERIFICATION);
-
-        $order = Order::query()->findOrFail($orderId);
-
-        $this->assertNotNull($order->payment_proof);
-
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
-        $storage = Storage::disk(Order::PAYMENT_PROOF_DISK);
-        $storage->assertExists($order->payment_proof);
-    }
-
-    public function test_admin_can_approve_verified_transfer_payment(): void
-    {
-        Storage::fake(Order::PAYMENT_PROOF_DISK);
-
-        $user = $this->createCustomerUser();
-        $admin = $this->createAdminUser();
-
-        $product = $this->createProduct(price: 450000);
-
-        CartItem::query()->create([
-            'user_id' => $user->id,
-            'product_id' => $product->id,
-            'quantity' => 1,
-        ]);
-
-        $orderId = (string) $this->actingAs($user, 'sanctum')
-            ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
-            ]))
-            ->json('data.id');
-
-        $this->actingAs($user, 'sanctum')
-            ->post("/api/orders/{$orderId}/payment-proof", [
-                'payment_proof' => UploadedFile::fake()->image('payment-proof.png'),
-            ])
-            ->assertOk();
-
-        $this->actingAs($admin, 'sanctum')
-            ->patchJson("/api/admin/orders/{$orderId}", [
-                'payment_status' => Order::PAYMENT_STATUS_PAID,
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_PAID)
-            ->assertJsonPath('data.statusKey', Order::STATUS_PROCESSING);
-    }
-
-    public function test_admin_reject_requires_reason_and_customer_can_reupload(): void
-    {
-        Storage::fake(Order::PAYMENT_PROOF_DISK);
-
         $user = $this->createCustomerUser();
         $admin = $this->createAdminUser();
         $product = $this->createProduct(price: 450000);
@@ -278,42 +330,46 @@ class OrderPaymentFlowTest extends TestCase
 
         $orderId = (string) $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]))
             ->json('data.id');
 
-        $this->actingAs($user, 'sanctum')
-            ->post("/api/orders/{$orderId}/payment-proof", [
-                'payment_proof' => UploadedFile::fake()->image('payment-proof.png'),
-            ])
-            ->assertOk();
-
         $this->actingAs($admin, 'sanctum')
             ->patchJson("/api/admin/orders/{$orderId}", [
-                'payment_status' => Order::PAYMENT_STATUS_REJECTED,
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'Alasan penolakan wajib diisi.');
-
-        $this->actingAs($admin, 'sanctum')
-            ->patchJson("/api/admin/orders/{$orderId}", [
-                'payment_status' => Order::PAYMENT_STATUS_REJECTED,
-                'payment_rejection_reason' => 'Nominal transfer tidak sesuai.',
+                'status' => Order::STATUS_SHIPPED,
             ])
             ->assertOk()
-            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_REJECTED)
-            ->assertJsonPath('data.paymentRejectionReason', 'Nominal transfer tidak sesuai.');
-
-        $this->actingAs($user, 'sanctum')
-            ->post("/api/orders/{$orderId}/payment-proof", [
-                'payment_proof' => UploadedFile::fake()->image('payment-proof-reupload.png'),
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.paymentStatusKey', Order::PAYMENT_STATUS_WAITING_VERIFICATION)
-            ->assertJsonPath('data.paymentRejectionReason', null);
+            ->assertJsonPath('data.statusKey', Order::STATUS_SHIPPED);
     }
 
-    public function test_transfer_order_becomes_expired_after_deadline(): void
+    public function test_customer_can_complete_shipped_order(): void
+    {
+        $user = $this->createCustomerUser();
+        $product = $this->createProduct(price: 450000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ]);
+
+        $orderId = (string) $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            ]))
+            ->json('data.id');
+
+        Order::query()->whereKey($orderId)->update([
+            'status' => Order::STATUS_SHIPPED,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/orders/{$orderId}/complete")
+            ->assertOk()
+            ->assertJsonPath('data.statusKey', Order::STATUS_COMPLETED);
+    }
+
+    public function test_waiting_midtrans_order_is_cancelled_after_deadline(): void
     {
         $user = $this->createCustomerUser();
 
@@ -327,7 +383,7 @@ class OrderPaymentFlowTest extends TestCase
 
         $orderId = (string) $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]))
             ->json('data.id');
 
@@ -338,7 +394,7 @@ class OrderPaymentFlowTest extends TestCase
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/orders')
             ->assertOk()
-            ->assertJsonPath('data.0.paymentStatusKey', Order::PAYMENT_STATUS_EXPIRED)
+            ->assertJsonPath('data.0.paymentStatusKey', Order::PAYMENT_STATUS_CANCELLED)
             ->assertJsonPath('data.0.statusKey', Order::STATUS_CANCELLED);
 
         $this->assertDatabaseHas('products', [
@@ -347,10 +403,11 @@ class OrderPaymentFlowTest extends TestCase
         ]);
     }
 
-    public function test_admin_cancel_restores_reserved_stock(): void
+    public function test_midtrans_expire_notification_cancels_order_and_restores_stock(): void
     {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+
         $user = $this->createCustomerUser();
-        $admin = $this->createAdminUser();
         $product = $this->createProduct(price: 450000);
 
         CartItem::query()->create([
@@ -361,7 +418,7 @@ class OrderPaymentFlowTest extends TestCase
 
         $orderId = (string) $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]))
             ->json('data.id');
 
@@ -370,13 +427,28 @@ class OrderPaymentFlowTest extends TestCase
             'stock' => 8,
         ]);
 
-        $this->actingAs($admin, 'sanctum')
-            ->patchJson("/api/admin/orders/{$orderId}", [
-                'status' => Order::STATUS_CANCELLED,
-                'cancellation_reason' => 'Stok dialihkan ke pembelian lain.',
-            ])
-            ->assertOk()
-            ->assertJsonPath('data.statusKey', Order::STATUS_CANCELLED);
+        $midtransOrderId = 'NEXA-'.$orderId.'-EXPIRE';
+        Order::query()->whereKey($orderId)->update([
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+            'midtrans_order_id' => $midtransOrderId,
+        ]);
+
+        $grossAmount = '900000.00';
+
+        $this->postJson('/api/payments/midtrans/notification', [
+            'order_id' => $midtransOrderId,
+            'status_code' => '407',
+            'gross_amount' => $grossAmount,
+            'signature_key' => hash('sha512', $midtransOrderId.'407'.$grossAmount.'SB-Mid-server-test'),
+            'transaction_status' => 'expire',
+            'payment_type' => 'qris',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'payment_status' => Order::PAYMENT_STATUS_CANCELLED,
+            'status' => Order::STATUS_CANCELLED,
+        ]);
 
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
@@ -384,7 +456,7 @@ class OrderPaymentFlowTest extends TestCase
         ]);
     }
 
-    public function test_checkout_is_rejected_when_stock_is_no_longer_sufficient(): void
+    public function test_checkout_is_blocked_when_stock_is_no_longer_sufficient(): void
     {
         $user = $this->createCustomerUser();
         $product = $this->createProduct(price: 450000);
@@ -401,7 +473,7 @@ class OrderPaymentFlowTest extends TestCase
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/orders', $this->orderPayload([
-                'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
             ]))
             ->assertStatus(422)
             ->assertJsonPath('message', 'Stok '.$product->name.' tidak cukup. Tersisa 2 unit.');
@@ -450,7 +522,7 @@ class OrderPaymentFlowTest extends TestCase
             'address' => 'Batam Center',
             'city' => 'Batam',
             'postal_code' => '29400',
-            'payment_method' => Order::PAYMENT_METHOD_BANK_TRANSFER,
+            'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
         ], $overrides);
     }
 }

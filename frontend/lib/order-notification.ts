@@ -4,8 +4,6 @@ import type { OrderData } from "@/lib/store";
 import type { AppToastInput } from "@/lib/toast";
 
 const CUSTOMER_ORDER_STATE_KEY = "nexatech.customer-order-state.v1";
-const ADMIN_WAITING_VERIFICATION_KEY = "nexatech.admin-waiting-verification.v1";
-
 function readMap(key: string): Record<string, string> {
     if (typeof window === "undefined") {
         return {};
@@ -31,7 +29,6 @@ function buildCustomerOrderSnapshot(order: OrderData) {
     return [
         order.paymentStatusKey,
         order.statusKey,
-        order.paymentRejectionReason ?? "",
         order.cancellationReason ?? "",
     ].join("|");
 }
@@ -40,40 +37,24 @@ function buildCustomerOrderToast(order: OrderData): AppToastInput | null {
     if (order.statusKey === "cancelled") {
         return {
             tone: "warning",
-            title: "Order dibatalkan admin",
+            title: "Order dibatalkan",
             message: order.cancellationReason
                 ? `Alasan: ${order.cancellationReason}`
-                : "Pesanan Anda dibatalkan oleh admin. Silakan hubungi admin untuk detail lebih lanjut.",
+                : "Pesanan dibatalkan karena pembayaran Midtrans tidak selesai.",
         };
     }
 
     switch (order.paymentStatusKey) {
-        case "waiting_verification":
-            return {
-                tone: "info",
-                title: "Bukti pembayaran terkirim",
-                message:
-                    "Bukti transfer sudah masuk dan sedang menunggu verifikasi admin.",
-            };
-        case "paid":
+        case "processing":
             return {
                 tone: "success",
-                title: "Pembayaran diterima",
-                message:
-                    "Pembayaran Anda berhasil dikonfirmasi dan pesanan sedang diproses.",
+                title: "Order diproses",
+                message: "Pembayaran diterima dan pesanan sedang diproses.",
             };
-        case "rejected":
-            return {
-                tone: "error",
-                title: "Pembayaran ditolak",
-                message: order.paymentRejectionReason
-                    ? `Silakan upload ulang bukti transfer. Alasan admin: ${order.paymentRejectionReason}`
-                    : "Silakan upload ulang bukti transfer sebelum batas waktu berakhir.",
-            };
-        case "expired":
+        case "cancelled":
             return {
                 tone: "warning",
-                title: "Pembayaran kedaluwarsa",
+                title: "Order dibatalkan",
                 message:
                     "Batas waktu pembayaran habis dan pesanan dibatalkan otomatis.",
             };
@@ -115,38 +96,6 @@ export function syncCustomerOrderNotifications(
     return notifications;
 }
 
-export function syncAdminVerificationNotifications(
-    orders: OrderData[],
-): AppToastInput | null {
-    const previous = readMap(ADMIN_WAITING_VERIFICATION_KEY);
-    const next: Record<string, string> = {};
-
-    const waitingVerificationOrders = orders.filter(
-        (order) =>
-            order.paymentMethodKey === "bank_transfer" &&
-            order.paymentStatusKey === "waiting_verification",
-    );
-
-    waitingVerificationOrders.forEach((order) => {
-        next[order.id] = order.orderNumber;
-    });
-
-    writeMap(ADMIN_WAITING_VERIFICATION_KEY, next);
-
-    const unseenOrders = waitingVerificationOrders.filter(
-        (order) => !previous[order.id],
-    );
-
-    if (unseenOrders.length === 0) {
-        return null;
-    }
-
-    return {
-        tone: "info",
-        title: "Pembayaran baru perlu verifikasi",
-        message:
-            unseenOrders.length === 1
-                ? `${unseenOrders[0]?.orderNumber} baru saja mengirim bukti transfer dan menunggu dicek admin.`
-                : `${unseenOrders.length} order baru mengirim bukti transfer dan menunggu verifikasi admin.`,
-    };
+export function syncAdminOrderNotifications(): AppToastInput | null {
+    return null;
 }

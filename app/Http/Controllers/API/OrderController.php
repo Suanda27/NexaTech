@@ -22,7 +22,7 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
 
         $orders = Order::query()
             ->select([
@@ -42,7 +42,6 @@ class OrderController extends Controller
                 'midtrans_redirect_url',
                 'midtrans_transaction_status',
                 'midtrans_payment_type',
-                'payment_rejection_reason',
                 'cancellation_reason',
                 'decline_reason',
                 'subtotal',
@@ -66,7 +65,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => $orders
-                ->map(fn (Order $order) => $this->serializeOrder($order, false))
+                ->map(fn (Order $order) => $this->serializeOrder($order))
                 ->values(),
         ]);
     }
@@ -92,16 +91,13 @@ class OrderController extends Controller
             'address' => ['required', 'string'],
             'city' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'max:20'],
-            'payment_method' => ['required', 'in:bank_transfer,cod,midtrans'],
+            'payment_method' => ['required', 'in:midtrans'],
         ]);
 
-        Order::expirePendingTransferPayments();
+        Order::expirePendingMidtransPayments();
 
         try {
-            if (
-                $validated['payment_method'] === Order::PAYMENT_METHOD_MIDTRANS
-                && !$this->midtransPaymentService->isConfigured()
-            ) {
+            if (!$this->midtransPaymentService->isConfigured()) {
                 throw ValidationException::withMessages([
                     'payment_method' => ['MIDTRANS_SERVER_KEY belum diisi.'],
                 ]);
@@ -110,9 +106,7 @@ class OrderController extends Controller
             $order = $this->orderCheckoutService->createFromCart(
                 $request->user(),
                 $validated,
-                $validated['payment_method'] === Order::PAYMENT_METHOD_MIDTRANS
-                    ? fn (Order $order) => $this->midtransPaymentService->createSnapTransaction($order)
-                    : null,
+                fn (Order $order) => $this->midtransPaymentService->createSnapTransaction($order),
             );
         } catch (ValidationException $exception) {
             return response()->json([
@@ -127,54 +121,44 @@ class OrderController extends Controller
         ], 201);
     }
 
-    public function submitPaymentProof(Request $request, Order $order)
+    public function complete(Request $request, Order $order)
     {
-        Order::expirePendingTransferPayments();
+        try {
+            $updatedOrder = $this->orderCheckoutService->completeShippedOrder(
+                $order,
+                $request->user(),
+            );
+        } catch (ValidationException $exception) {
+            return response()->json([
+                'message' => collect($exception->errors())->flatten()->first() ?? 'Order tidak bisa diselesaikan.',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
 
+        return response()->json([
+            'message' => 'Order berhasil diselesaikan.',
+            'data' => $this->serializeOrder($updatedOrder),
+        ]);
+    }
+
+    public function syncMidtrans(Request $request, Order $order)
+    {
         if ($order->user_id !== $request->user()->id) {
             abort(404);
         }
 
-        $validated = $request->validate([
-            'payment_proof' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-        ]);
-
         try {
-            $updatedOrder = $this->orderCheckoutService->submitPaymentProof(
-                $order,
-                $validated['payment_proof'],
-            );
+            $updatedOrder = $this->midtransPaymentService->syncTransactionStatus($order);
         } catch (ValidationException $exception) {
             return response()->json([
-                'message' => collect($exception->errors())->flatten()->first() ?? 'Gagal mengirim bukti pembayaran.',
+                'message' => collect($exception->errors())->flatten()->first() ?? 'Status Midtrans gagal disinkronkan.',
                 'errors' => $exception->errors(),
             ], 422);
         }
 
         return response()->json([
-            'message' => 'Bukti pembayaran berhasil dikirim untuk diverifikasi admin.',
-            'data' => $this->serializeOrder($updatedOrder, false),
-        ]);
-    }
-
-    public function cancelPendingMidtrans(Request $request, Order $order)
-    {
-        try {
-            $cancelledOrder = $this->orderCheckoutService->cancelPendingMidtransOrder(
-                $order,
-                $request->user(),
-            );
-            $this->midtransPaymentService->cancelTransaction($cancelledOrder);
-        } catch (ValidationException $exception) {
-            return response()->json([
-                'message' => collect($exception->errors())->flatten()->first() ?? 'Order tidak bisa dibatalkan.',
-                'errors' => $exception->errors(),
-            ], 422);
-        }
-
-        return response()->json([
-            'message' => 'Pembayaran dibatalkan. Item dikembalikan ke cart.',
-            'data' => $this->serializeOrder($cancelledOrder, false),
+            'message' => 'Status Midtrans berhasil disinkronkan.',
+            'data' => $this->serializeOrder($updatedOrder),
         ]);
     }
 
