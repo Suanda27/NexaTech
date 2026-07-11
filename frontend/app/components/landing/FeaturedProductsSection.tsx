@@ -52,9 +52,8 @@ export default function FeaturedProductsSection() {
                             {t("Fresh product visuals from the live catalog.")}
                         </h2>
                         <p className="mt-4 text-base leading-relaxed text-gray-600 sm:text-lg">
-                            Section ini sekarang mengikuti data produk dari
-                            backend, jadi isi landing akan ikut berubah saat
-                            produk di admin diperbarui.
+                            Temukan perangkat pilihan dengan kualitas dan
+                            performa terbaik untuk aktivitas Anda setiap hari.
                         </p>
                     </div>
 
@@ -79,11 +78,10 @@ export default function FeaturedProductsSection() {
                 ) : products.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-16 text-center">
                         <p className="text-lg font-semibold text-slate-950">
-                            Belum ada produk unggulan
+                            Produk pilihan segera hadir
                         </p>
                         <p className="mt-2 text-sm text-slate-500">
-                            Produk yang punya gambar dan status aktif akan
-                            otomatis muncul di sini.
+                            Nantikan koleksi teknologi terbaik dari NexaTech.
                         </p>
                     </div>
                 ) : (

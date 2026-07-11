@@ -90,7 +90,7 @@ class ApiEndpointSmokeTest extends TestCase
         $this->getJson('/api/products/recommendations')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.recommendationReason', 'Produk acak');
+            ->assertJsonPath('data.0.recommendationReason', 'Produk terlaris');
 
         $this->getJson('/api/products?q=NexaBook&category='.$category->slug.'&sort=best_selling&per_page=8')
             ->assertOk()

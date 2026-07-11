@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useShop } from "@/context/ShopContext";
+import { useLanguage } from "@/context/LanguageContext";
 import HeaderGuest from "@/app/components/header/HeaderGuest";
 import HeaderUser from "@/app/components/header/HeaderUser";
 import Footer from "@/app/components/footer/Footer";
@@ -30,11 +31,14 @@ import {
 import { queueFlashToast } from "@/lib/toast";
 import { loadMidtransSnap } from "@/lib/midtrans";
 
+const CHECKOUT_SELECTION_KEY = "nexatech.checkout.selectedProductIds";
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
     const { notify } = useToast();
+    const { t } = useLanguage();
     const payment = "midtrans" as const;
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPaymentPopupOpening, setIsPaymentPopupOpening] = useState(false);
@@ -48,6 +52,9 @@ export default function CheckoutPage() {
             itemCount: 0,
         },
     });
+    const [selectedProductIds, setSelectedProductIds] = useState<number[] | null>(
+        null,
+    );
     const [form, setForm] = useState({
         firstName: "",
         lastName: "",
@@ -71,6 +78,28 @@ export default function CheckoutPage() {
 
             if (cartResult.status === "fulfilled") {
                 setCart(cartResult.value);
+
+                const storedSelection = sessionStorage.getItem(
+                    CHECKOUT_SELECTION_KEY,
+                );
+
+                if (storedSelection) {
+                    try {
+                        const parsedSelection = JSON.parse(storedSelection);
+
+                        setSelectedProductIds(
+                            Array.isArray(parsedSelection)
+                                ? parsedSelection
+                                      .map((productId) => Number(productId))
+                                      .filter(Number.isFinite)
+                                : null,
+                        );
+                    } catch {
+                        setSelectedProductIds(null);
+                    }
+                } else {
+                    setSelectedProductIds(null);
+                }
             } else {
                 notify({
                     tone: "error",
@@ -124,6 +153,9 @@ export default function CheckoutPage() {
                 city: form.city,
                 postal_code: form.postalCode,
                 payment_method: payment,
+                ...(selectedProductIds
+                    ? { selected_product_ids: selectedProductIds }
+                    : {}),
             });
 
             if (
@@ -132,6 +164,7 @@ export default function CheckoutPage() {
             ) {
                 if (response.data.midtransSnapToken.startsWith("mock-")) {
                     await refreshCartCount();
+                    sessionStorage.removeItem(CHECKOUT_SELECTION_KEY);
                     queueFlashToast({
                         tone: "success",
                         title: "Checkout berhasil",
@@ -151,6 +184,7 @@ export default function CheckoutPage() {
                 }
 
                 await refreshCartCount();
+                sessionStorage.removeItem(CHECKOUT_SELECTION_KEY);
 
                 await new Promise<void>((resolve) => {
                     let isOrderFinalized = false;
@@ -232,6 +266,7 @@ export default function CheckoutPage() {
             }
 
             await refreshCartCount();
+            sessionStorage.removeItem(CHECKOUT_SELECTION_KEY);
             queueFlashToast({
                 tone: "success",
                 title: "Checkout berhasil",
@@ -255,7 +290,40 @@ export default function CheckoutPage() {
         }
     };
 
-    const isCartEmpty = cart.items.length === 0;
+    const selectedProductIdSet = useMemo(
+        () => (selectedProductIds ? new Set(selectedProductIds) : null),
+        [selectedProductIds],
+    );
+
+    const checkoutItems = useMemo(
+        () =>
+            selectedProductIdSet
+                ? cart.items.filter((item) =>
+                      selectedProductIdSet.has(item.productId),
+                  )
+                : cart.items,
+        [cart.items, selectedProductIdSet],
+    );
+
+    const checkoutSummary = useMemo(() => {
+        const subtotal = checkoutItems.reduce(
+            (sum, item) => sum + item.price * item.qty,
+            0,
+        );
+        const itemCount = checkoutItems.reduce((sum, item) => sum + item.qty, 0);
+        const shipping = subtotal > 0 ? cart.summary.shipping : 0;
+        const tax = subtotal > 0 ? cart.summary.tax : 0;
+
+        return {
+            subtotal,
+            shipping,
+            tax,
+            total: subtotal + shipping + tax,
+            itemCount,
+        };
+    }, [cart.summary.shipping, cart.summary.tax, checkoutItems]);
+
+    const isCartEmpty = checkoutItems.length === 0;
 
     const inputClass =
         "w-full rounded-lg border border-gray-200 bg-white py-3 pl-11 pr-4 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
@@ -431,15 +499,15 @@ export default function CheckoutPage() {
                                 </div>
 
                                 <div className="space-y-5 p-5 sm:p-6">
-                                    {cart.items.length === 0 ? (
+                                    {checkoutItems.length === 0 ? (
                                         <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 p-5 text-center text-sm text-slate-500">
                                             Belum ada item checkout. Summary akan
-                                            terisi setelah Anda menambahkan produk
-                                            ke cart.
+                                            terisi setelah Anda memilih produk di
+                                            cart.
                                         </div>
                                     ) : (
                                         <>
-                                            {cart.items.map((item) => (
+                                            {checkoutItems.map((item) => (
                                                 <div
                                                     key={item.productId}
                                                     className="rounded-lg border border-gray-200 bg-gray-50 p-4"
@@ -466,21 +534,21 @@ export default function CheckoutPage() {
                                             <div className="space-y-3 text-sm">
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">
-                                                        Subtotal
+                                                        {t("Subtotal")}
                                                     </span>
                                                     <span className="font-semibold text-gray-950">
                                                         Rp{" "}
-                                                        {cart.summary.subtotal.toLocaleString(
+                                                        {checkoutSummary.subtotal.toLocaleString(
                                                             "id-ID",
                                                         )}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-600">
-                                                        Shipping
+                                                        {t("Shipping")}
                                                     </span>
                                                     <span className="rounded-lg bg-green-50 px-2 py-1 text-xs font-bold text-green-700 ring-1 ring-green-100">
-                                                        FREE
+                                                        {t("FREE")}
                                                     </span>
                                                 </div>
                                             </div>
@@ -488,11 +556,11 @@ export default function CheckoutPage() {
                                             <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
                                                 <div className="flex justify-between">
                                                     <span className="font-bold text-gray-950">
-                                                        Total
+                                                        {t("Total")}
                                                     </span>
                                                     <span className="text-2xl font-extrabold text-blue-700">
                                                         Rp{" "}
-                                                        {cart.summary.total.toLocaleString(
+                                                        {checkoutSummary.total.toLocaleString(
                                                             "id-ID",
                                                         )}
                                                     </span>
@@ -502,29 +570,15 @@ export default function CheckoutPage() {
                                     )}
 
                                     <button
-                                        type={isCartEmpty ? "button" : "submit"}
-                                        onClick={
-                                            isCartEmpty
-                                                ? () => router.push("/cart")
-                                                : undefined
-                                        }
-                                        disabled={
-                                            isSubmitting ||
-                                            (!isCartEmpty && cart.items.length === 0)
-                                        }
-                                        className={`flex w-full items-center justify-center gap-2 rounded-lg py-4 font-bold text-white shadow-lg transition hover:-translate-y-0.5 ${
-                                            isCartEmpty
-                                                ? "bg-slate-700 shadow-slate-100 hover:bg-slate-800"
-                                                : "bg-blue-600 shadow-blue-100 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
-                                        }`}
+                                        type="submit"
+                                        disabled={isSubmitting || isCartEmpty}
+                                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-4 font-bold text-white shadow-lg shadow-blue-100 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
-                                        {isCartEmpty
-                                            ? "Kembali ke Cart"
-                                            : isSubmitting
-                                              ? isPaymentPopupOpening
-                                                  ? "Membuka Popup..."
-                                                  : "Processing..."
-                                              : "Place Order"}
+                                        {isSubmitting
+                                            ? isPaymentPopupOpening
+                                                ? t("Opening Popup...")
+                                                : t("Processing...")
+                                            : t("Continue Checkout")}
                                         {isSubmitting ? (
                                             <LoaderCircle className="h-5 w-5 animate-spin" />
                                         ) : (
@@ -538,14 +592,14 @@ export default function CheckoutPage() {
                                 <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
                                     <ShieldCheck className="h-5 w-5 text-green-700" />
                                     <p className="text-sm font-semibold text-green-900">
-                                        Your purchase is protected
+                                        {t("Your purchase is protected")}
                                     </p>
                                 </div>
 
                                 <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50/70 p-4">
                                     <Truck className="h-5 w-5 text-blue-600" />
                                     <p className="text-sm font-semibold text-blue-900">
-                                        Fast processing after payment confirmation
+                                        {t("Fast processing after payment confirmation")}
                                     </p>
                                 </div>
                             </div>

@@ -104,6 +104,66 @@ class OrderPaymentFlowTest extends TestCase
             && $request['transaction_details']['gross_amount'] === 450000);
     }
 
+    public function test_customer_can_checkout_only_selected_cart_items(): void
+    {
+        config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
+        config()->set('services.midtrans.is_production', false);
+
+        Http::fake([
+            'app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
+                'token' => 'snap-token-selected-items',
+                'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-selected-items',
+            ]),
+        ]);
+
+        $user = $this->createCustomerUser();
+        $selectedProduct = $this->createProduct(price: 450000);
+        $remainingProduct = $this->createProduct(price: 250000);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $selectedProduct->id,
+            'quantity' => 2,
+        ]);
+
+        CartItem::query()->create([
+            'user_id' => $user->id,
+            'product_id' => $remainingProduct->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/orders', $this->orderPayload([
+                'payment_method' => Order::PAYMENT_METHOD_MIDTRANS,
+                'selected_product_ids' => [$selectedProduct->id],
+            ]))
+            ->assertCreated()
+            ->assertJsonPath('data.summary.total', 900000)
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.productId', $selectedProduct->id);
+
+        $this->assertDatabaseMissing('cart_items', [
+            'user_id' => $user->id,
+            'product_id' => $selectedProduct->id,
+        ]);
+        $this->assertDatabaseHas('cart_items', [
+            'user_id' => $user->id,
+            'product_id' => $remainingProduct->id,
+            'quantity' => 1,
+        ]);
+        $this->assertDatabaseHas('products', [
+            'id' => $selectedProduct->id,
+            'stock' => 8,
+        ]);
+        $this->assertDatabaseHas('products', [
+            'id' => $remainingProduct->id,
+            'stock' => 10,
+        ]);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions'
+            && $request['transaction_details']['gross_amount'] === 900000);
+    }
+
     public function test_midtrans_checkout_keeps_cart_when_snap_transaction_fails(): void
     {
         config()->set('services.midtrans.server_key', 'SB-Mid-server-test');
