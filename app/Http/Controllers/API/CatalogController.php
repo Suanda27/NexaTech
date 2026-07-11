@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductSearch;
 use App\Support\StoredImage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -149,91 +150,182 @@ class CatalogController extends Controller
 
     public function recommendations(Request $request)
     {
-        $user = $request->user();
+        $user  = $request->user();
+        $limit = 8;
 
+        // ── Step 1: Ambil history pembelian user ini ──────────────────────────
         $purchasedProductIds = OrderItem::query()
-            ->whereHas('order', fn ($query) => $query->where('user_id', $user->id))
+            ->whereHas('order', fn ($q) => $q->where('user_id', $user->id))
             ->whereNotNull('product_id')
             ->pluck('product_id')
             ->unique()
             ->values();
 
-        $purchasedProducts = Product::query()
-            ->with('category')
+        $purchasedCategoryIds = Product::query()
             ->whereIn('id', $purchasedProductIds)
-            ->get();
+            ->pluck('category_id')
+            ->filter()
+            ->unique()
+            ->values();
 
-        $products = Product::query()
+        // Belum pernah beli → tampilkan random
+        if ($purchasedCategoryIds->isEmpty()) {
+            return response()->json([
+                'data' => $this->randomRecommendations($limit),
+            ]);
+        }
+
+        // ── Step 2: Co-purchase binary — cukup 1x kemunculan ─────────────────
+        // Cari kategori-kategori yang pernah muncul di order yang sama
+        // dengan kategori yang user ini pernah beli. Flat (binary), bukan frekuensi.
+        $relatedOrderIds = OrderItem::query()
+            ->whereNotNull('product_id')
+            ->whereHas('product', fn ($q) => $q->whereIn('category_id', $purchasedCategoryIds))
+            ->pluck('order_id')
+            ->unique();
+
+        /** @var Collection<int|string, bool> $coPurchaseCategoryIds */
+        $coPurchaseCategoryIds = collect();
+
+        if ($relatedOrderIds->isNotEmpty()) {
+            $coPurchaseCategoryIds = OrderItem::query()
+                ->whereIn('order_id', $relatedOrderIds)
+                ->whereNotNull('product_id')
+                ->whereHas('product', fn ($q) => $q->whereNotIn('category_id', $purchasedCategoryIds))
+                ->with('product:id,category_id')
+                ->get()
+                ->pluck('product.category_id')
+                ->filter()
+                ->unique()
+                ->flip(); // jadikan key untuk lookup O(1)
+        }
+
+        // ── Step 3: Ambil semua produk aktif yang belum dibeli user ──────────
+        $candidates = Product::query()
             ->with('category')
             ->withSum('orderItems as sold_quantity', 'quantity')
             ->where('status', Product::STATUS_ACTIVE)
             ->whereNotIn('id', $purchasedProductIds)
             ->get();
 
-        $purchasedCategoryIds = $purchasedProducts
-            ->pluck('category_id')
-            ->filter()
-            ->unique();
-        $hasLaptopPurchase = $purchasedProducts->contains(
-            fn (Product $product) => $this->matchesAnyKeyword($product, [
-                'laptop',
-                'notebook',
-                'macbook',
-            ]),
-        );
+        // ── Step 4: 4-Tier Flat Scoring ───────────────────────────────────────
+        //
+        //  TIER 1 (100): Cross-category + pernah co-purchase di toko (Pelengkap prioritas 1)
+        //  TIER 2  (80): Cross-category + match semantic keyword (Pelengkap prioritas 2)
+        //  TIER 3  (50): Same-category (Produk serupa)
+        //  TIER 4  (20): Cross-category APAPUN (Kategori lain keseluruhan)
+        //
+        //  Popularity boost: max 10 — hanya sebagai tie-breaker dalam tier
 
-        $rankedProducts = $products
-            ->map(function (Product $product) use (
-                $hasLaptopPurchase,
-                $purchasedCategoryIds
-            ) {
-                $score = 0;
-                $reason = null;
+        $scored = $candidates->map(function (Product $product) use (
+            $coPurchaseCategoryIds,
+            $purchasedCategoryIds,
+        ) {
+            $isCrossCategory = ! $purchasedCategoryIds->contains($product->category_id);
+            $score           = 0;
+            $reason          = null;
 
-                if ($purchasedCategoryIds->contains($product->category_id)) {
-                    $score += 35;
-                    $reason = 'Mirip dengan produk yang pernah dibeli';
+            if ($isCrossCategory) {
+                // Tier 1 — co-purchase binary (flat, 1 kejadian sudah cukup)
+                if ($coPurchaseCategoryIds->has($product->category_id)) {
+                    $score  = 100;
+                    $reason = 'Sering dibeli bersama';
                 }
 
-                if ($hasLaptopPurchase && $this->matchesAnyKeyword($product, [
-                    'accessories',
-                    'aksesoris',
-                    'accessory',
-                    'keyboard',
-                    'mouse',
-                    'mousepad',
-                    'monitor',
-                    'headset',
-                    'ssd',
-                    'storage',
-                ])) {
-                    $score += 85;
-                    $reason = 'Pelengkap laptop Anda';
+                // Tier 2 — semantic keyword match
+                if ($score < 80) {
+                    $semanticBoost = $this->semanticScore($product, $purchasedCategoryIds);
+                    if ($semanticBoost > 0) {
+                        $score  = max($score, 80);
+                        $reason = $reason ?? 'Pelengkap pembelian Anda';
+                    }
                 }
 
-                if ($score > 0) {
-                    $score += min((int) ($product->sold_quantity ?? 0), 20);
+                // Tier 4 — Kategori lain keseluruhan
+                if ($score === 0) {
+                    $score  = 20;
+                    $reason = 'Produk pilihan untukmu';
                 }
+            } else {
+                // Tier 3 — same-category (produk serupa)
+                $score  = 50;
+                $reason = 'Mirip pembelian Anda';
+            }
 
-                return [
-                    'product' => $product,
-                    'score' => $score,
-                    'reason' => $reason ?? 'Berdasarkan riwayat pembelian',
-                ];
-            })
-            ->filter(fn (array $item) => $item['score'] > 0)
-            ->sortByDesc('score')
-            ->take(8)
-            ->values();
+            // Popularity tie-breaker kecil (max 10) — hanya menentukan urutan dalam tier
+            $score += min((int) ($product->sold_quantity ?? 0), 10);
 
-        if ($rankedProducts->isEmpty()) {
-            return response()->json([
-                'data' => $this->randomRecommendations(),
-            ]);
+            return [
+                'product' => $product,
+                'score'   => $score,
+                'reason'  => $reason,
+            ];
+        });
+
+        // ── Step 5: Ambil produk teratas dengan Category Diversity ────────────
+        // Batasi maksimal 2 produk per kategori agar rekomendasi lebih beragam.
+        $topProducts = collect();
+        $categoryCounts = [];
+        
+        $sortedScored = $scored->sortByDesc('score')->values();
+        
+        // Pass 1: Ambil maksimal 2 produk per kategori
+        foreach ($sortedScored as $item) {
+            $catId = $item['product']->category_id;
+            $catIdKey = $catId ?? 'no_cat';
+            if (!isset($categoryCounts[$catIdKey])) {
+                $categoryCounts[$catIdKey] = 0;
+            }
+            
+            if ($categoryCounts[$catIdKey] < 2) {
+                $topProducts->push($item);
+                $categoryCounts[$catIdKey]++;
+            }
+            
+            if ($topProducts->count() >= $limit) {
+                break;
+            }
+        }
+        
+        // Pass 2: Jika masih kurang dari batas, longgarkan batas kategori (ambil sisa)
+        if ($topProducts->count() < $limit) {
+            $pickedIds = $topProducts->pluck('product.id');
+            foreach ($sortedScored as $item) {
+                if ($topProducts->count() >= $limit) {
+                    break;
+                }
+                if (!$pickedIds->contains($item['product']->id)) {
+                    $topProducts->push($item);
+                }
+            }
+        }
+
+        // ── Step 6: Isi sisa slot dengan random jika produk aktif < limit ─────
+        if ($topProducts->count() < $limit) {
+            $needed     = $limit - $topProducts->count();
+            $excludeIds = $topProducts
+                ->pluck('product.id')
+                ->merge($purchasedProductIds)
+                ->unique()
+                ->values();
+
+            $fillers = Product::query()
+                ->where('status', Product::STATUS_ACTIVE)
+                ->whereNotIn('id', $excludeIds)
+                ->inRandomOrder()
+                ->take($needed)
+                ->get()
+                ->map(fn (Product $p) => [
+                    'product' => $p,
+                    'score'   => 0,
+                    'reason'  => 'Produk pilihan untukmu',
+                ]);
+
+            $topProducts = $topProducts->concat($fillers)->values();
         }
 
         return response()->json([
-            'data' => $rankedProducts
+            'data' => $topProducts
                 ->map(fn (array $item) => [
                     ...$this->serializeProduct($item['product']),
                     'recommendationReason' => $item['reason'],
@@ -241,6 +333,7 @@ class CatalogController extends Controller
                 ->values(),
         ]);
     }
+
 
     public function show(Product $product)
     {
@@ -275,7 +368,7 @@ class CatalogController extends Controller
         ]);
     }
 
-    private function randomRecommendations(int $limit = 8)
+    private function randomRecommendations(int $limit = 8): Collection
     {
         return Product::query()
             ->with('category')
@@ -285,23 +378,122 @@ class CatalogController extends Controller
             ->get()
             ->map(fn (Product $product) => [
                 ...$this->serializeProduct($product),
-                'recommendationReason' => 'Produk acak',
+                'recommendationReason' => 'Produk pilihan untukmu',
             ])
             ->values();
     }
 
-    private function matchesAnyKeyword(Product $product, array $keywords): bool
+    /**
+     * Semantic keyword fallback — bekerja tanpa data transaksi (cold start).
+     * Menggunakan pola peran produk (primary device vs. aksesoris/peripheral)
+     * untuk menduga keterkaitan, tanpa hardcode per nama kategori.
+     *
+     * @param  Collection<int, int|string>  $purchasedCategoryIds
+     */
+    private function semanticScore(Product $product, Collection $purchasedCategoryIds): int
     {
-        $haystack = Str::lower(implode(' ', [
-            $product->name,
-            $product->description,
-            $product->sku,
-            $product->category?->nama_kategori,
-            $product->category?->slug,
-        ]));
+        // Keyword penanda "perangkat utama" (primary device)
+        $primaryKeywords = [
+            'laptop','notebook','macbook','ultrabook',
+            'pc','komputer','computer','desktop',
+            'smartphone','handphone','hp','iphone','android',
+            'tablet','ipad',
+            'monitor','display','screen','layar',
+            'tv','televisi','television',
+            'printer','scanner',
+            'kamera','camera','dslr','mirrorless',
+            'router','modem',
+            'console','playstation','xbox','nintendo',
+        ];
 
+        // Keyword penanda "aksesoris / peripheral"
+        $accessoryKeywords = [
+            'aksesoris','accessories','accessory','peripheral',
+            'mouse','keyboard','keypad','numpad',
+            'headset','headphone','earphone','earbuds','speaker','audio',
+            'mousepad','deskpad',
+            'webcam','microphone','mic',
+            'charger','adaptor','adapter','power adapter',
+            'kabel','cable','hdmi','usb','type-c','lightning',
+            'case','cover','casing','sleeve','bag','tas',
+            'stand','holder','mount','bracket',
+            'hub','dock','docking',
+            'ssd','storage','flashdisk','hardisk','harddisk','memory','ram','sd card',
+            'powerbank','power bank','baterai','battery',
+            'cooling','cooler','fan','kipas',
+            'tinta','ink','cartridge','toner','kertas','paper',
+        ];
+
+        $productIsPrimary   = $this->textMatchesKeywords(
+            Str::lower(implode(' ', array_filter([
+                $product->name,
+                $product->description,
+                $product->sku,
+                $product->category?->nama_kategori,
+                $product->category?->slug,
+            ]))),
+            $primaryKeywords
+        );
+
+        $productIsAccessory = $this->textMatchesKeywords(
+            Str::lower(implode(' ', array_filter([
+                $product->name,
+                $product->description,
+                $product->sku,
+                $product->category?->nama_kategori,
+                $product->category?->slug,
+            ]))),
+            $accessoryKeywords
+        );
+
+        // Tentukan peran kategori yang pernah dibeli user
+        $userBoughtPrimary   = false;
+        $userBoughtAccessory = false;
+
+        foreach ($purchasedCategoryIds as $catId) {
+            /** @var Category|null $cat */
+            $cat = Category::find($catId);
+            if (! $cat) {
+                continue;
+            }
+
+            $haystack = Str::lower($cat->nama_kategori.' '.$cat->slug);
+
+            if ($this->textMatchesKeywords($haystack, $primaryKeywords)) {
+                $userBoughtPrimary = true;
+            }
+
+            if ($this->textMatchesKeywords($haystack, $accessoryKeywords)) {
+                $userBoughtAccessory = true;
+            }
+        }
+
+        // Cross-recommendation:
+        // beli primary → rekomendasikan aksesoris
+        if ($userBoughtPrimary && $productIsAccessory) {
+            return 60;
+        }
+        // beli aksesoris → rekomendasikan primary device
+        if ($userBoughtAccessory && $productIsPrimary) {
+            return 45;
+        }
+        // beli aksesoris → rekomendasikan aksesoris lain yang berbeda kategori
+        if ($userBoughtAccessory && $productIsAccessory) {
+            return 30;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Cek apakah suatu teks mengandung salah satu keyword dari daftar.
+     *
+     * @param  array<int, string>  $keywords
+     */
+    private function textMatchesKeywords(string $text, array $keywords): bool
+    {
         foreach ($keywords as $keyword) {
-            if ($keyword !== '' && Str::contains($haystack, Str::lower($keyword))) {
+            if ($keyword !== '' && Str::contains($text, Str::lower($keyword))) {
                 return true;
             }
         }
