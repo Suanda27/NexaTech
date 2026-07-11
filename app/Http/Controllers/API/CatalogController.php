@@ -127,7 +127,7 @@ class CatalogController extends Controller
     public function publicRecommendations()
     {
         return response()->json([
-            'data' => $this->randomRecommendations(),
+            'data' => $this->bestSellingRecommendations(),
         ]);
     }
 
@@ -163,6 +163,26 @@ class CatalogController extends Controller
             ->whereIn('id', $purchasedProductIds)
             ->get();
 
+        if ($purchasedProducts->isEmpty()) {
+            return response()->json([
+                'data' => $this->bestSellingRecommendations(),
+            ]);
+        }
+
+        $relatedOrderIds = OrderItem::query()
+            ->whereIn('product_id', $purchasedProductIds)
+            ->pluck('order_id')
+            ->unique()
+            ->values();
+
+        $coPurchasedCounts = OrderItem::query()
+            ->selectRaw('product_id, SUM(quantity) as bought_together_count')
+            ->whereIn('order_id', $relatedOrderIds)
+            ->whereNotNull('product_id')
+            ->whereNotIn('product_id', $purchasedProductIds)
+            ->groupBy('product_id')
+            ->pluck('bought_together_count', 'product_id');
+
         $products = Product::query()
             ->with('category')
             ->withSum('orderItems as sold_quantity', 'quantity')
@@ -182,53 +202,72 @@ class CatalogController extends Controller
             ]),
         );
 
-        $rankedProducts = $products
-            ->map(function (Product $product) use (
-                $hasLaptopPurchase,
-                $purchasedCategoryIds
-            ) {
-                $score = 0;
-                $reason = null;
+        $complementaryKeywords = $purchasedProducts
+            ->flatMap(fn (Product $product) => $this->complementaryKeywordsForProduct($product))
+            ->unique()
+            ->values()
+            ->all();
 
-                if ($purchasedCategoryIds->contains($product->category_id)) {
-                    $score += 35;
-                    $reason = 'Mirip dengan produk yang pernah dibeli';
-                }
+        $buildItem = fn (Product $product, int $baseScore, string $reason, int $bonus = 0) => [
+            'product' => $product,
+            'score' => $baseScore
+                + $bonus
+                + min((int) ($product->sold_quantity ?? 0), 30)
+                + ((int) round(((float) $product->rating) * 6)),
+            'reason' => $reason,
+        ];
 
-                if ($hasLaptopPurchase && $this->matchesAnyKeyword($product, [
-                    'accessories',
-                    'aksesoris',
-                    'accessory',
-                    'keyboard',
-                    'mouse',
-                    'mousepad',
-                    'monitor',
-                    'headset',
-                    'ssd',
-                    'storage',
-                ])) {
-                    $score += 85;
-                    $reason = 'Pelengkap laptop Anda';
-                }
-
-                if ($score > 0) {
-                    $score += min((int) ($product->sold_quantity ?? 0), 20);
-                }
-
-                return [
-                    'product' => $product,
-                    'score' => $score,
-                    'reason' => $reason ?? 'Berdasarkan riwayat pembelian',
-                ];
-            })
-            ->filter(fn (array $item) => $item['score'] > 0)
+        $crossSell = $products
+            ->filter(fn (Product $product) => $this->matchesAnyKeyword($product, $complementaryKeywords))
+            ->map(fn (Product $product) => $buildItem(
+                $product,
+                120,
+                $hasLaptopPurchase ? 'Pelengkap laptop Anda' : 'Pelengkap produk Anda',
+            ))
             ->sortByDesc('score')
-            ->take(8)
             ->values();
+
+        $oftenBoughtTogether = $products
+            ->filter(fn (Product $product) => (int) ($coPurchasedCounts[$product->id] ?? 0) > 0)
+            ->map(fn (Product $product) => $buildItem(
+                $product,
+                110,
+                'Sering dibeli bersamaan',
+                (int) ($coPurchasedCounts[$product->id] ?? 0) * 8,
+            ))
+            ->sortByDesc('score')
+            ->values();
+
+        $similar = $products
+            ->filter(fn (Product $product) => $purchasedCategoryIds->contains($product->category_id))
+            ->map(fn (Product $product) => $buildItem($product, 55, 'Mirip dengan pembelian Anda'))
+            ->sortByDesc('score')
+            ->values();
+
+        $topRated = $products
+            ->filter(fn (Product $product) => (float) $product->rating >= 4)
+            ->map(fn (Product $product) => $buildItem($product, 45, 'Pilihan dengan rating tinggi'))
+            ->sortByDesc('score')
+            ->values();
+
+        $goodValue = $products
+            ->sortBy('price')
+            ->take(12)
+            ->map(fn (Product $product) => $buildItem($product, 35, 'Pilihan harga terbaik'))
+            ->sortByDesc('score')
+            ->values();
+
+        $rankedProducts = $this->interleaveRecommendationBuckets([
+            $crossSell,
+            $oftenBoughtTogether,
+            $topRated,
+            $goodValue,
+            $similar,
+        ], 12);
 
         if ($rankedProducts->isEmpty()) {
             return response()->json([
-                'data' => $this->randomRecommendations(),
+                'data' => $this->bestSellingRecommendations(),
             ]);
         }
 
@@ -250,17 +289,11 @@ class CatalogController extends Controller
 
         $product->load(['category', 'specifications']);
 
-        $relatedProducts = Product::query()
-            ->with('category')
-            ->where('status', Product::STATUS_ACTIVE)
-            ->whereKeyNot($product->id)
-            ->when(
-                $product->category_id,
-                fn ($query) => $query->where('category_id', $product->category_id),
-            )
-            ->latest()
-            ->take(4)
-            ->get();
+        $relatedProducts = $this->crossSellRecommendationsForProduct($product, 8)
+            ->map(fn (array $item) => [
+                ...$this->serializeProduct($item['product']),
+                'recommendationReason' => $item['reason'],
+            ]);
 
         return response()->json([
             'data' => [
@@ -268,26 +301,190 @@ class CatalogController extends Controller
                 'gallery' => array_values(array_filter([
                     StoredImage::toPublicUrl($product->image_url),
                 ])),
-                'relatedProducts' => $relatedProducts
-                    ->map(fn (Product $item) => $this->serializeProduct($item))
-                    ->values(),
+                'relatedProducts' => $relatedProducts->values(),
             ],
         ]);
     }
 
-    private function randomRecommendations(int $limit = 8)
+    private function bestSellingRecommendations(int $limit = 12)
     {
         return Product::query()
             ->with('category')
+            ->withSum('orderItems as sold_quantity', 'quantity')
             ->where('status', Product::STATUS_ACTIVE)
-            ->inRandomOrder()
+            ->orderByDesc('sold_quantity')
+            ->orderByDesc('rating')
+            ->orderByDesc('stock')
             ->take($limit)
             ->get()
             ->map(fn (Product $product) => [
                 ...$this->serializeProduct($product),
-                'recommendationReason' => 'Produk acak',
+                'recommendationReason' => 'Produk terlaris',
             ])
             ->values();
+    }
+
+    /**
+     * Shows complementary items first, with bestselling items as a guaranteed
+     * fallback so a product page never has an empty recommendation area.
+     */
+    private function crossSellRecommendationsForProduct(Product $product, int $limit)
+    {
+        $candidates = Product::query()
+            ->with('category')
+            ->withSum('orderItems as sold_quantity', 'quantity')
+            ->where('status', Product::STATUS_ACTIVE)
+            ->whereKeyNot($product->id)
+            ->get();
+
+        $keywords = $this->complementaryKeywordsForProduct($product);
+        $crossSell = $candidates
+            ->filter(fn (Product $candidate) => $this->matchesAnyKeyword($candidate, $keywords))
+            ->sortByDesc(fn (Product $candidate) => (int) ($candidate->sold_quantity ?? 0))
+            ->map(fn (Product $candidate) => [
+                'product' => $candidate,
+                'reason' => 'Pelengkap '.$product->name,
+            ]);
+
+        $fallback = $candidates
+            ->reject(fn (Product $candidate) => $this->matchesAnyKeyword($candidate, $keywords))
+            ->sortByDesc(fn (Product $candidate) =>
+                ((int) ($candidate->sold_quantity ?? 0) * 1000)
+                + ((int) round((float) $candidate->rating) * 100)
+                + min((int) $candidate->stock, 99)
+            )
+            ->map(fn (Product $candidate) => [
+                'product' => $candidate,
+                'reason' => 'Produk terlaris',
+            ]);
+
+        return $this->interleaveRecommendationBuckets([$crossSell, $fallback], $limit);
+    }
+
+    private function complementaryKeywordsForProduct(Product $product): array
+    {
+        $rules = [
+            ['needles' => ['laptop', 'notebook', 'macbook'], 'complements' => [
+                'accessories',
+                'aksesoris',
+                'keyboard',
+                'mouse',
+                'mousepad',
+                'monitor',
+                'headset',
+                'ram',
+                'memory',
+                'ssd',
+                'storage',
+                'flashdisk',
+                'cooler',
+                'stand',
+            ]],
+            ['needles' => ['mousepad', 'mouse pad'], 'complements' => [
+                'mouse',
+                'keyboard',
+                'monitor',
+                'headset',
+                'accessories',
+                'aksesoris',
+            ]],
+            ['needles' => ['mouse'], 'complements' => [
+                'mousepad',
+                'mouse pad',
+                'monitor',
+                'keyboard',
+                'headset',
+                'accessories',
+                'aksesoris',
+            ]],
+            ['needles' => ['keyboard'], 'complements' => [
+                'mouse',
+                'mousepad',
+                'mouse pad',
+                'wrist',
+                'headset',
+                'accessories',
+                'aksesoris',
+            ]],
+            ['needles' => ['monitor'], 'complements' => [
+                'keyboard',
+                'mouse',
+                'mousepad',
+                'hdmi',
+                'cable',
+                'stand',
+                'accessories',
+                'aksesoris',
+            ]],
+            ['needles' => ['printer'], 'complements' => [
+                'ink',
+                'tinta',
+                'paper',
+                'kertas',
+                'scanner',
+                'storage',
+            ]],
+            ['needles' => ['ssd', 'storage', 'harddisk', 'hdd'], 'complements' => [
+                'laptop',
+                'pc',
+                'enclosure',
+                'adapter',
+                'cable',
+            ]],
+        ];
+
+        $keywords = [];
+
+        foreach ($rules as $rule) {
+            if ($this->matchesAnyKeyword($product, $rule['needles'])) {
+                $keywords = array_merge($keywords, $rule['complements']);
+            }
+        }
+
+        return array_values(array_unique($keywords ?: [
+            'accessories',
+            'aksesoris',
+            'keyboard',
+            'mouse',
+            'mousepad',
+            'monitor',
+            'headset',
+            'storage',
+        ]));
+    }
+
+    private function interleaveRecommendationBuckets(array $buckets, int $limit)
+    {
+        $results = collect();
+        $usedProductIds = collect();
+
+        while ($results->count() < $limit) {
+            $addedThisRound = false;
+
+            foreach ($buckets as $bucket) {
+                $nextItem = $bucket->first(
+                    fn (array $item) => !$usedProductIds->contains($item['product']->id),
+                );
+
+                if (!$nextItem) {
+                    continue;
+                }
+
+                $results->push($nextItem);
+                $usedProductIds->push($nextItem['product']->id);
+                $addedThisRound = true;
+
+                if ($results->count() >= $limit) {
+                    break;
+                }
+            }
+
+            if (!$addedThisRound) {
+                break;
+            }
+        }
+
+        return $results->values();
     }
 
     private function matchesAnyKeyword(Product $product, array $keywords): bool

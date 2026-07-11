@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
     ArrowRight,
     CreditCard,
@@ -27,7 +28,10 @@ import {
     updateCartItem,
 } from "@/lib/store";
 
+const CHECKOUT_SELECTION_KEY = "nexatech.checkout.selectedProductIds";
+
 export default function CartPage() {
+    const router = useRouter();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
     const [cart, setCart] = useState<CartResponse>({
@@ -41,6 +45,7 @@ export default function CartPage() {
         },
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
 
     useEffect(() => {
         let mounted = true;
@@ -51,6 +56,7 @@ export default function CartPage() {
 
                 if (mounted) {
                     setCart(response);
+                    setSelectedProductIds([]);
                 }
             } catch {
                 if (mounted) {
@@ -64,6 +70,7 @@ export default function CartPage() {
                             itemCount: 0,
                         },
                     });
+                    setSelectedProductIds([]);
                 }
             } finally {
                 if (mounted) {
@@ -83,6 +90,15 @@ export default function CartPage() {
         try {
             const response = await updater;
             setCart(response);
+            setSelectedProductIds((current) => {
+                const availableProductIds = new Set(
+                    response.items.map((item) => item.productId),
+                );
+
+                return current.filter((productId) =>
+                    availableProductIds.has(productId),
+                );
+            });
             await refreshCartCount();
         } catch (error) {
             alert(error instanceof Error ? error.message : "Gagal update cart.");
@@ -99,6 +115,66 @@ export default function CartPage() {
 
     const removeItem = (item: CartItem) => {
         void syncCart(removeCartItem(item.productId));
+    };
+
+    const selectedProductIdSet = useMemo(
+        () => new Set(selectedProductIds),
+        [selectedProductIds],
+    );
+
+    const selectedItems = useMemo(
+        () =>
+            cart.items.filter((item) =>
+                selectedProductIdSet.has(item.productId),
+            ),
+        [cart.items, selectedProductIdSet],
+    );
+
+    const selectedSummary = useMemo(() => {
+        const subtotal = selectedItems.reduce(
+            (sum, item) => sum + item.price * item.qty,
+            0,
+        );
+        const itemCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+        const shipping = subtotal > 0 ? cart.summary.shipping : 0;
+        const tax = subtotal > 0 ? cart.summary.tax : 0;
+
+        return {
+            subtotal,
+            shipping,
+            tax,
+            total: subtotal + shipping + tax,
+            itemCount,
+        };
+    }, [cart.summary.shipping, cart.summary.tax, selectedItems]);
+
+    const areAllItemsSelected =
+        cart.items.length > 0 && selectedProductIds.length === cart.items.length;
+
+    const toggleItemSelection = (productId: number) => {
+        setSelectedProductIds((current) =>
+            current.includes(productId)
+                ? current.filter((id) => id !== productId)
+                : [...current, productId],
+        );
+    };
+
+    const toggleAllItems = () => {
+        setSelectedProductIds(
+            areAllItemsSelected ? [] : cart.items.map((item) => item.productId),
+        );
+    };
+
+    const proceedToCheckout = () => {
+        if (selectedProductIds.length === 0) {
+            return;
+        }
+
+        sessionStorage.setItem(
+            CHECKOUT_SELECTION_KEY,
+            JSON.stringify(selectedProductIds),
+        );
+        router.push("/checkout");
     };
 
     return (
@@ -160,90 +236,123 @@ export default function CartPage() {
                                     </Link>
                                 </div>
                             ) : (
-                                cart.items.map((item) => (
-                                    <div
-                                        key={item.productId}
-                                        className="group overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/50 transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70"
-                                    >
-                                        <div className="flex flex-col gap-4 p-4 sm:flex-row">
-                                            <div className="h-44 w-full shrink-0 overflow-hidden rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100 sm:h-28 sm:w-28">
-                                                {item.image ? (
-                                                    <img
-                                                        src={item.image}
-                                                        alt={item.name}
-                                                        className="h-full w-full rounded-md object-cover transition duration-500 group-hover:scale-110"
-                                                    />
-                                                ) : (
-                                                    <div className="flex h-full w-full items-center justify-center rounded-md bg-white text-sm font-semibold text-blue-600">
-                                                        No Image
-                                                    </div>
-                                                )}
-                                            </div>
+                                <>
+                                    <div className="flex flex-col gap-3 rounded-lg border border-blue-100 bg-white p-4 shadow-sm shadow-blue-100/50 sm:flex-row sm:items-center sm:justify-between">
+                                        <label className="flex items-center gap-3 text-sm font-bold text-gray-950">
+                                            <input
+                                                type="checkbox"
+                                                checked={areAllItemsSelected}
+                                                onChange={toggleAllItems}
+                                                className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Pilih semua item
+                                        </label>
+                                        <span className="text-sm font-semibold text-blue-700">
+                                            {selectedSummary.itemCount} item dipilih
+                                        </span>
+                                    </div>
 
-                                            <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
-                                                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-                                                    <div className="min-w-0">
-                                                        <h3 className="font-bold text-gray-950 transition group-hover:text-blue-700">
-                                                            {item.name}
-                                                        </h3>
-                                                        <p className="mt-1 text-sm text-gray-500">
-                                                            {item.category ?? "Catalog item"}
-                                                        </p>
-                                                    </div>
-                                                    <div className="sm:text-right">
-                                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                                            Unit Price
-                                                        </p>
-                                                        <p className="font-bold text-gray-950">
-                                                            Rp {item.price.toLocaleString("id-ID")}
-                                                        </p>
-                                                    </div>
+                                    {cart.items.map((item) => (
+                                        <div
+                                            key={item.productId}
+                                            className="group overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm shadow-blue-100/50 transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/70"
+                                        >
+                                            <div className="flex flex-col gap-4 p-4 sm:flex-row">
+                                                <label className="flex items-center gap-3 sm:self-start sm:pt-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedProductIdSet.has(
+                                                            item.productId,
+                                                        )}
+                                                        onChange={() =>
+                                                            toggleItemSelection(
+                                                                item.productId,
+                                                            )
+                                                        }
+                                                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        aria-label={`Pilih ${item.name} untuk checkout`}
+                                                    />
+                                                </label>
+
+                                                <div className="h-44 w-full shrink-0 overflow-hidden rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100 sm:h-28 sm:w-28">
+                                                    {item.image ? (
+                                                        <img
+                                                            src={item.image}
+                                                            alt={item.name}
+                                                            className="h-full w-full rounded-md object-cover transition duration-500 group-hover:scale-110"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex h-full w-full items-center justify-center rounded-md bg-white text-sm font-semibold text-blue-600">
+                                                            No Image
+                                                        </div>
+                                                    )}
                                                 </div>
 
-                                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1.5 shadow-inner">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => decreaseQty(item)}
-                                                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-blue-50 hover:text-blue-700"
-                                                        >
-                                                            <Minus className="h-4 w-4" />
-                                                        </button>
-
-                                                        <span className="min-w-8 text-center font-bold text-gray-950">
-                                                            {item.qty}
-                                                        </span>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => increaseQty(item)}
-                                                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
-                                                        >
-                                                            <Plus className="h-4 w-4" />
-                                                        </button>
+                                                <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-gray-950 transition group-hover:text-blue-700">
+                                                                {item.name}
+                                                            </h3>
+                                                            <p className="mt-1 text-sm text-gray-500">
+                                                                {item.category ?? "Catalog item"}
+                                                            </p>
+                                                        </div>
+                                                        <div className="sm:text-right">
+                                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                                                Unit Price
+                                                            </p>
+                                                            <p className="font-bold text-gray-950">
+                                                                Rp {item.price.toLocaleString("id-ID")}
+                                                            </p>
+                                                        </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
-                                                            Rp{" "}
-                                                            {(item.price * item.qty).toLocaleString(
-                                                                "id-ID",
-                                                            )}
+                                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1.5 shadow-inner">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => decreaseQty(item)}
+                                                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-gray-600 shadow-sm ring-1 ring-gray-100 transition hover:bg-blue-50 hover:text-blue-700"
+                                                            >
+                                                                <Minus className="h-4 w-4" />
+                                                            </button>
+
+                                                            <span className="min-w-8 text-center font-bold text-gray-950">
+                                                                {item.qty}
+                                                            </span>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => increaseQty(item)}
+                                                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"
+                                                            >
+                                                                <Plus className="h-4 w-4" />
+                                                            </button>
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeItem(item)}
-                                                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-500 transition hover:-translate-y-0.5 hover:bg-red-600 hover:text-white"
-                                                            aria-label={`Remove ${item.name}`}
-                                                        >
-                                                            <Trash2 className="h-5 w-5" />
-                                                        </button>
+
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+                                                                Rp{" "}
+                                                                {(item.price * item.qty).toLocaleString(
+                                                                    "id-ID",
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeItem(item)}
+                                                                className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-500 transition hover:-translate-y-0.5 hover:bg-red-600 hover:text-white"
+                                                                aria-label={`Remove ${item.name}`}
+                                                            >
+                                                                <Trash2 className="h-5 w-5" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    ))}
+                                </>
                             )}
                         </div>
 
@@ -272,7 +381,7 @@ export default function CartPage() {
                                                 Subtotal
                                             </span>
                                             <span className="font-semibold text-gray-900">
-                                                Rp {cart.summary.subtotal.toLocaleString("id-ID")}
+                                                Rp {selectedSummary.subtotal.toLocaleString("id-ID")}
                                             </span>
                                         </div>
 
@@ -290,7 +399,7 @@ export default function CartPage() {
                                                 Estimated Tax
                                             </span>
                                             <span className="font-semibold text-gray-900">
-                                                Rp {cart.summary.tax.toLocaleString("id-ID")}
+                                                Rp {selectedSummary.tax.toLocaleString("id-ID")}
                                             </span>
                                         </div>
                                     </div>
@@ -301,22 +410,24 @@ export default function CartPage() {
                                                 Total
                                             </span>
                                             <span className="text-2xl font-extrabold text-blue-700">
-                                                Rp {cart.summary.total.toLocaleString("id-ID")}
+                                                Rp {selectedSummary.total.toLocaleString("id-ID")}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <Link
-                                        href="/checkout"
+                                    <button
+                                        type="button"
+                                        onClick={proceedToCheckout}
                                         className={`flex w-full items-center justify-center gap-2 rounded-lg py-4 font-bold text-white shadow-lg transition ${
-                                            cart.items.length === 0
+                                            selectedProductIds.length === 0
                                                 ? "pointer-events-none bg-gray-300 shadow-none"
                                                 : "bg-blue-600 shadow-blue-100 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-blue-200"
                                         }`}
+                                        disabled={selectedProductIds.length === 0}
                                     >
                                         Proceed to Checkout
                                         <ArrowRight className="h-5 w-5" />
-                                    </Link>
+                                    </button>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-3 border-t border-gray-100 p-5 text-sm">

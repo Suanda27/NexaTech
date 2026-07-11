@@ -1,6 +1,6 @@
 "use client";
 
-import { fetchJson } from "@/lib/auth";
+import { authFetch, fetchJson } from "@/lib/auth";
 import type { OrderStatusKey, PaymentStatusKey } from "@/lib/order-status";
 
 export type ApiCategory = {
@@ -329,6 +329,7 @@ export function createOrder(payload: {
     city: string;
     postal_code: string;
     payment_method: "midtrans";
+    selected_product_ids?: number[];
 }) {
     return sendJson<{ message: string; data: OrderData }>("/api/orders", {
         method: "POST",
@@ -355,7 +356,9 @@ export function syncMidtransOrder(orderId: string) {
 }
 
 export function fetchAdminDashboard() {
-    return fetchJson<AdminDashboardResponse>("/api/admin/dashboard");
+    return fetchJson<AdminDashboardResponse>("/api/admin/dashboard", {
+        cache: "no-store",
+    });
 }
 
 export function fetchAdminCategories() {

@@ -92,6 +92,8 @@ class OrderController extends Controller
             'city' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'max:20'],
             'payment_method' => ['required', 'in:midtrans'],
+            'selected_product_ids' => ['sometimes', 'array', 'min:1'],
+            'selected_product_ids.*' => ['integer'],
         ]);
 
         Order::expirePendingMidtransPayments();

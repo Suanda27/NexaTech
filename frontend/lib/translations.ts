@@ -30,7 +30,7 @@ export const translations: Record<string, string> = {
     "Admin Menu": "Menu Admin",
     "Commerce control center": "Pusat kendali toko",
     "Hello,": "Halo,",
-    Dashboard: "Dasbor",
+    Dashboard: "Dashboard",
     "Manajemen Order": "Manajemen Order",
     "Your Cart": "Keranjang Anda",
     "Shopping Cart": "Keranjang Belanja",
@@ -39,6 +39,7 @@ export const translations: Record<string, string> = {
     "Order Summary": "Ringkasan Pesanan",
     Total: "Total",
     "Proceed to Checkout": "Lanjut ke Checkout",
+    "Continue Checkout": "Lanjutkan Pembayaran",
     "Secure payment": "Pembayaran aman",
     "Fast delivery": "Pengiriman cepat",
     "All Categories": "Semua Kategori",
@@ -94,10 +95,38 @@ export const translations: Record<string, string> = {
         "Bergabung dengan ribuan pelanggan yang mempercayakan kebutuhan teknologinya kepada kami.",
     "Featured Products": "Produk Unggulan",
     "Fresh product visuals from the live catalog.":
-        "Tampilan produk terbaru dari katalog aktif.",
+        "Pilihan teknologi terbaik untuk Anda.",
     "View All Products": "Lihat Semua Produk",
     "Recommended Products": "Rekomendasi Produk",
     "Recommended For You": "Rekomendasi Untuk Anda",
+    "Recommendations that follow how you shop.":
+        "Rekomendasi yang mengikuti cara belanjamu.",
+    "Products in this section are randomized for guests, then adjust to purchase history and complementary categories after you log in.":
+        "Produk di bagian ini ditampilkan acak untuk guest, lalu menyesuaikan histori pembelian dan kategori pelengkap setelah kamu login.",
+    "Discover selected technology products to help you find what you need.":
+        "Temukan pilihan produk teknologi untuk membantu Anda mendapatkan yang dibutuhkan.",
+    "If you bought a laptop, accessories like mouse, keyboard, headset, monitor, and storage will be prioritized.":
+        "Jika kamu membeli laptop, aksesoris seperti mouse, keyboard, headset, monitor, dan storage akan diprioritaskan.",
+    "Log in to see recommendations that match your purchase history.":
+        "Login untuk melihat rekomendasi yang menyesuaikan riwayat pembelianmu.",
+    "Recommendations are not available yet":
+        "Rekomendasi belum tersedia",
+    "Add active products from admin so this section can show recommendations.":
+        "Tambahkan produk aktif dari admin agar section ini bisa menampilkan rekomendasi.",
+    "Explore our collection and find the technology that suits you.":
+        "Jelajahi koleksi kami dan temukan teknologi yang paling sesuai untuk Anda.",
+    "Recommended product from the NexaTech catalog.":
+        "Produk rekomendasi dari katalog NexaTech.",
+    "Random product": "Produk acak",
+    "Laptop companion": "Pelengkap laptop Anda",
+    "Complete your setup": "Lengkapi setup Anda",
+    "Often bought together": "Sering dibeli bersama",
+    "Similar to your purchase": "Mirip dengan produk yang pernah dibeli",
+    "Top rated pick": "Pilihan rating tinggi",
+    "Good value pick": "Pilihan harga menarik",
+    "Based on your purchases": "Berdasarkan riwayat pembelian",
+    "Related Recommendations": "Rekomendasi Terkait",
+    "You May Also Like": "Anda Mungkin Suka",
     "Personalized picks": "Pilihan personal",
     "Random picks": "Pilihan acak",
     "Browse Categories": "Jelajahi Kategori",
@@ -110,6 +139,7 @@ export const translations: Record<string, string> = {
     "Add to Cart": "Tambah ke Keranjang",
     "Buy Now": "Beli Sekarang",
     "Back to Home": "Kembali ke Beranda",
+    "Back to Products": "Kembali ke Produk",
     Home: "Beranda",
     Profile: "Profil",
     Address: "Alamat",
@@ -416,7 +446,6 @@ export const translations: Record<string, string> = {
     "Total Product": "Total Produk",
     "Payment Detail": "Detail Pembayaran",
     "Order Total": "Total Order",
-    "Payment Status": "Status Pembayaran",
     "Midtrans payments are verified automatically through webhook notifications.":
         "Pembayaran Midtrans diperbarui otomatis melalui notifikasi webhook.",
     "Order Action": "Aksi Order",

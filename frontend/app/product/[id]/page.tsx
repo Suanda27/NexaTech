@@ -25,12 +25,14 @@ import {
     type ApiProduct,
 } from "@/lib/store";
 import { getSpecIcon } from "@/app/admin/product/utils";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function ProductDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const { refreshCartCount } = useShop();
     const { notify } = useToast();
+    const { t } = useLanguage();
     const [product, setProduct] = useState<ApiProduct | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -103,7 +105,7 @@ export default function ProductDetailPage() {
                         href="/product"
                         className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                     >
-                        <ArrowLeft className="h-4 w-4" /> Back to Products
+                        <ArrowLeft className="h-4 w-4" /> {t("Back to Products")}
                     </Link>
 
                     {isLoading ? (
@@ -309,10 +311,10 @@ export default function ProductDetailPage() {
                                 <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                                     <div>
                                         <p className="text-sm font-semibold text-blue-600">
-                                            Related Recommendations
+                                            {t("Related Recommendations")}
                                         </p>
                                         <h2 className="text-2xl font-bold text-gray-950">
-                                            You May Also Like
+                                            {t("You May Also Like")}
                                         </h2>
                                     </div>
                                 </div>
@@ -333,7 +335,7 @@ export default function ProductDetailPage() {
                                                         />
                                                     ) : (
                                                         <div className="flex h-full w-full items-center justify-center rounded-lg bg-white text-sm font-semibold text-blue-600">
-                                                            No Image
+                                                            {t("No Image")}
                                                         </div>
                                                     )}
                                                 </div>

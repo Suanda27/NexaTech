@@ -15,13 +15,26 @@ class OrderCheckoutService
 {
     public function createFromCart(User $user, array $payload, ?callable $afterOrderCreated = null): Order
     {
-        $cartItems = CartItem::where('user_id', $user->id)
-            ->with('product')
-            ->get();
+        $selectedProductIds = collect($payload['selected_product_ids'] ?? [])
+            ->filter(fn ($productId) => is_numeric($productId))
+            ->map(fn ($productId) => (int) $productId)
+            ->unique()
+            ->values();
+
+        $cartItemsQuery = CartItem::where('user_id', $user->id)
+            ->with('product');
+
+        if ($selectedProductIds->isNotEmpty()) {
+            $cartItemsQuery->whereIn('product_id', $selectedProductIds);
+        }
+
+        $cartItems = $cartItemsQuery->get();
 
         if ($cartItems->isEmpty()) {
             throw ValidationException::withMessages([
-                'cart' => ['Cart masih kosong.'],
+                'cart' => [$selectedProductIds->isNotEmpty()
+                    ? 'Item checkout yang dipilih tidak ditemukan di cart.'
+                    : 'Cart masih kosong.'],
             ]);
         }
 
@@ -78,6 +91,7 @@ class OrderCheckoutService
 
             CartItem::query()
                 ->where('user_id', $user->id)
+                ->whereIn('product_id', $cartItems->pluck('product_id')->filter()->values())
                 ->delete();
 
             return $order->load('items');

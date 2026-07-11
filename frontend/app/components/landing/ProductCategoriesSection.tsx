@@ -97,9 +97,8 @@ export default function ProductCategoriesSection() {
                     </h2>
 
                     <p className="mt-4 text-lg text-gray-600">
-                        Kategori di bawah ini sekarang mengikuti data admin,
-                        jadi gambar dan nama kategorinya akan ikut berubah dari
-                        panel Anda.
+                        Temukan perangkat dan aksesori pilihan untuk melengkapi
+                        kebutuhan teknologi Anda.
                     </p>
                 </div>
 
@@ -115,11 +114,10 @@ export default function ProductCategoriesSection() {
                 ) : categories.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-16 text-center">
                         <p className="text-lg font-semibold text-slate-950">
-                            Belum ada kategori aktif
+                            Koleksi kategori segera hadir
                         </p>
                         <p className="mt-2 text-sm text-slate-500">
-                            Tambahkan kategori dari admin agar section ini
-                            otomatis terisi.
+                            Nantikan pilihan produk terbaik dari NexaTech.
                         </p>
                     </div>
                 ) : (
