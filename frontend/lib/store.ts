@@ -355,9 +355,10 @@ export function syncMidtransOrder(orderId: string) {
     );
 }
 
-export function fetchAdminDashboard() {
+export function fetchAdminDashboard(init?: RequestInit) {
     return fetchJson<AdminDashboardResponse>("/api/admin/dashboard", {
         cache: "no-store",
+        ...init,
     });
 }
 

@@ -9,9 +9,7 @@ export type AuthUser = {
     address?: string | null;
 };
 
-const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
-    "http://localhost:8000";
+const API_BASE_URL = "http://localhost:8000";
 
 const TOKEN_KEY = "nexatech_token";
 let memoryToken: string | null = null;

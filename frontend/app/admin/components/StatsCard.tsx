@@ -27,7 +27,7 @@ export default function StatsCard({
                             {title}
                         </p>
                         <h3 className="text-3xl font-semibold tracking-tight text-slate-950">
-                            {value}
+                            {value} <span className="text-xs text-red-500">({typeof value}, len {value?.toString().length})</span>
                         </h3>
                     </div>
 

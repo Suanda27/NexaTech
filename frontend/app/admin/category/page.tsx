@@ -66,7 +66,10 @@ export default function CategoryPage() {
         }
     };
 
+    const [isMounted, setIsMounted] = useState(false);
+
     useEffect(() => {
+        setIsMounted(true);
         void loadCategories();
     }, []);
 
@@ -149,6 +152,10 @@ export default function CategoryPage() {
         }
     };
 
+    if (!isMounted) {
+        return null;
+    }
+
     return (
         <div className="px-4 py-6 sm:px-6 lg:px-8">
             <section className="overflow-hidden rounded-lg border border-blue-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef5ff_58%,#dbeafe_100%)]">
@@ -192,7 +199,7 @@ export default function CategoryPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                         Total Categories
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold text-slate-950">
+                                    <p key={summary.totalCategories} className="mt-1 text-2xl font-semibold text-slate-950">
                                         {summary.totalCategories}
                                     </p>
                                 </div>
@@ -208,7 +215,7 @@ export default function CategoryPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
                                         Total Products
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold">
+                                    <p key={totalProducts} className="mt-1 text-2xl font-semibold">
                                         {totalProducts}
                                     </p>
                                 </div>
@@ -216,7 +223,7 @@ export default function CategoryPage() {
                                     <Package2 className="h-5 w-5" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-300">
+                            <p key={`${activeCategories}-${inactiveCategories}`} className="mt-3 text-xs text-slate-300">
                                 {activeCategories} active, {inactiveCategories} inactive
                             </p>
                         </div>

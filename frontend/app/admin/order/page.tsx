@@ -224,6 +224,15 @@ export default function OrderPage() {
         }
     };
 
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) {
+        return null;
+    }
+
     return (
         <div className="px-4 py-6 sm:px-6 lg:px-8">
             <section className="overflow-hidden rounded-lg border border-blue-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef5ff_58%,#dbeafe_100%)]">
@@ -256,7 +265,7 @@ export default function OrderPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                         {t("Active Orders")}
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold text-slate-950">
+                                    <p key={summary.activeOrders} className="mt-1 text-2xl font-semibold text-slate-950">
                                         {summary.activeOrders}
                                     </p>
                                 </div>
@@ -272,7 +281,7 @@ export default function OrderPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
                                         {t("Order Summary")}
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold">
+                                    <p key={summary.totalOrders} className="mt-1 text-2xl font-semibold">
                                         {summary.totalOrders} {t("orders")}
                                     </p>
                                 </div>
@@ -280,7 +289,7 @@ export default function OrderPage() {
                                     <BadgeCheck className="h-5 w-5" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-300">
+                            <p key={`${summary.progressingOrders}-${summary.completedOrders}`} className="mt-3 text-xs text-slate-300">
                                 {summary.progressingOrders} {t("waiting payment/processing/shipped")},{" "}
                                 {summary.completedOrders} {t("completed")}
                             </p>
@@ -301,7 +310,7 @@ export default function OrderPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                         {t("Total Value")}
                                     </p>
-                                    <p className="mt-1 text-lg font-semibold text-slate-950">
+                                    <p key={summary.orderValue} className="mt-1 text-lg font-semibold text-slate-950">
                                         Rp {summary.orderValue.toLocaleString("id-ID")}
                                     </p>
                                 </div>
@@ -312,7 +321,7 @@ export default function OrderPage() {
                             <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                 {t("Completed")}
                             </p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-950">
+                            <p key={summary.completedOrders} className="mt-2 text-2xl font-semibold text-slate-950">
                                 {summary.completedOrders}
                             </p>
                         </div>
@@ -321,7 +330,7 @@ export default function OrderPage() {
                             <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                 {t("Waiting / Processing / Shipped")}
                             </p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-950">
+                            <p key={summary.progressingOrders} className="mt-2 text-2xl font-semibold text-slate-950">
                                 {summary.progressingOrders}
                             </p>
                         </div>

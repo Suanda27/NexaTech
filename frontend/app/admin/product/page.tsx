@@ -342,6 +342,15 @@ export default function ProductPage() {
         }
     };
 
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) {
+        return null;
+    }
+
     return (
         <div className="px-4 py-6 sm:px-6 lg:px-8">
             <section className="overflow-hidden rounded-lg border border-blue-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef5ff_58%,#dbeafe_100%)]">
@@ -383,7 +392,7 @@ export default function ProductPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                                         {t("Total Products")}
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold text-slate-950">
+                                    <p key={summary.totalProducts} className="mt-1 text-2xl font-semibold text-slate-950">
                                         {summary.totalProducts}
                                     </p>
                                 </div>
@@ -391,7 +400,7 @@ export default function ProductPage() {
                                     <Boxes className="h-5 w-5" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-500">
+                            <p key={activeProducts} className="mt-3 text-xs text-slate-500">
                                 {activeProducts} {t("active products in catalog")}
                             </p>
                         </div>
@@ -402,7 +411,7 @@ export default function ProductPage() {
                                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-blue-200">
                                         {t("Inventory Value")}
                                     </p>
-                                    <p className="mt-1 text-2xl font-semibold">
+                                    <p key={totalInventoryValue} className="mt-1 text-2xl font-semibold">
                                         {formatPrice(totalInventoryValue)}
                                     </p>
                                 </div>
@@ -410,7 +419,7 @@ export default function ProductPage() {
                                     <CircleDollarSign className="h-5 w-5" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-slate-300">
+                            <p key={totalStock} className="mt-3 text-xs text-slate-300">
                                 {totalStock} {t("total stock units available")}
                             </p>
                         </div>
