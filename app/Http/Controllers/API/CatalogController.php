@@ -94,6 +94,12 @@ class CatalogController extends Controller
             });
         }
 
+        if (($validated['price'] ?? null) === 'lowest') {
+            $query->orderBy('price', 'asc');
+        } elseif (($validated['price'] ?? null) === 'highest') {
+            $query->orderBy('price', 'desc');
+        }
+
         if (($validated['sort'] ?? null) === 'best_selling') {
             $query->withSum('orderItems as sold_quantity', 'quantity')
                 ->orderByDesc('sold_quantity');
@@ -101,12 +107,6 @@ class CatalogController extends Controller
             $query->orderBy('name');
         } else {
             $query->latest();
-        }
-
-        if (($validated['price'] ?? null) === 'lowest') {
-            $query->orderBy('price');
-        } elseif (($validated['price'] ?? null) === 'highest') {
-            $query->orderByDesc('price');
         }
 
         $perPage = $validated['per_page'] ?? 8;
