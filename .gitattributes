@@ -9,3 +9,20 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# ── GitHub Linguist Overrides ───────────────────────────────────────────────
+# Mencegah GitHub menghitung file-file berikut sebagai bahasa utama proyek.
+# Folder ini adalah tools/dependency, bukan kode aplikasi.
+
+# Python virtual environment & load testing tools
+.venv-locust/**         linguist-vendored
+loadtests/**            linguist-vendored
+requirements-loadtest.txt linguist-documentation
+
+# Temporary dependency folders
+.codex_tmp/**           linguist-vendored
+tmpdeps/**              linguist-vendored
+wheels/**               linguist-vendored
+
+# Frontend node_modules (jaga-jaga jika ter-track)
+frontend/node_modules/** linguist-vendored
