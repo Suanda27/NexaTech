@@ -1,59 +1,226 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+<h1 align="center">⚡ NexaTech</h1>
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  Platform e-commerce teknologi modern yang dibangun dengan arsitektur fullstack berbasis <strong>Laravel</strong> + <strong>Next.js</strong>.
 </p>
 
-## About Laravel
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel">
+  <img src="https://img.shields.io/badge/Next.js-16.x-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js">
+  <img src="https://img.shields.io/badge/PHP-8.2+-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Midtrans-Payment-00ADE5?style=for-the-badge" alt="Midtrans">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License">
+</p>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 📖 Apa itu NexaTech?
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**NexaTech** adalah platform e-commerce yang berfokus pada penjualan produk teknologi seperti laptop, smartphone, aksesoris, peripheral, dan perangkat elektronik lainnya. Proyek ini dibangun sebagai sistem fullstack yang memisahkan secara tegas antara **backend API** (Laravel) dan **frontend** (Next.js), dengan fitur-fitur yang siap untuk skala produksi.
 
-## Learning Laravel
+NexaTech hadir dengan sistem rekomendasi produk berbasis riwayat pembelian, integrasi pembayaran Midtrans, panel admin lengkap, manajemen keranjang belanja, hingga pencatatan riwayat pesanan — semua dalam satu ekosistem yang terstruktur dan modular.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+---
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 🛠️ Teknologi Utama
 
-## Laravel Sponsors
+### Backend
+| Teknologi | Versi | Keterangan |
+|---|---|---|
+| **PHP** | ^8.2 | Bahasa pemrograman utama |
+| **Laravel** | ^12.0 | Framework backend & REST API |
+| **Laravel Sanctum** | * | Autentikasi token berbasis SPA |
+| **SQLite / MySQL** | — | Database (default: SQLite untuk dev) |
+| **Laravel Sail** | ^1.41 | Lingkungan Docker untuk pengembangan |
+| **Pest PHP** | ^4.4 | Framework pengujian otomatis |
+| **Laravel Pint** | ^1.24 | Code formatter standar Laravel |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Frontend
+| Teknologi | Versi | Keterangan |
+|---|---|---|
+| **Next.js** | 16.x | Framework React untuk SSR & SSG |
+| **React** | 19.x | Library UI utama |
+| **TypeScript** | ^5 | Type-safe JavaScript |
+| **Tailwind CSS** | ^4 | Utility-first CSS framework |
+| **Framer Motion** | ^12 | Animasi & transisi UI |
+| **Recharts** | ^3 | Visualisasi data (grafik admin) |
+| **Lucide React** | ^0.577 | Ikon modern berbasis SVG |
 
-### Premium Partners
+### Infrastruktur & Integrasi
+| Teknologi | Keterangan |
+|---|---|
+| **Midtrans** | Payment gateway Indonesia (Snap) |
+| **Vite** | Build tool untuk asset Laravel |
+| **Concurrently** | Menjalankan server, queue, & vite paralel |
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+---
 
-## Contributing
+## ✨ Fitur Unggulan
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 🛍️ Pengalaman Belanja
+- **Katalog Produk** — Tampilan produk dengan filter kategori, pencarian full-text (nama, deskripsi, SKU), serta pengurutan berdasarkan harga, terbaru, atau terlaris.
+- **Detail Produk** — Galeri gambar, spesifikasi teknis, dan produk terkait dalam kategori yang sama.
+- **Keranjang Belanja** — Tambah, ubah jumlah, dan hapus item; serta fitur kosongkan keranjang sekaligus.
+- **Produk Unggulan** — Menampilkan 8 produk aktif terbaru di halaman beranda.
 
-## Code of Conduct
+### 🤖 Sistem Rekomendasi Cerdas (4-Tier Scoring)
+NexaTech memiliki mesin rekomendasi produk berbasis riwayat pembelian tanpa kebutuhan machine learning eksternal:
+- **Tier 1 (Skor 100)** — Produk dari kategori yang *sering dibeli bersama* (co-purchase) di order lain.
+- **Tier 2 (Skor 80)** — Produk yang cocok secara *semantik* (misal: beli laptop → rekomendasikan mouse, charger, tas).
+- **Tier 3 (Skor 50)** — Produk dari *kategori yang sama* dengan pembelian sebelumnya.
+- **Tier 4 (Skor 20)** — Produk dari *kategori lain* sebagai eksplorasi.
+- **Category Diversity** — Maksimal 2 produk per kategori untuk variasi rekomendasi.
+- **Cold Start** — Pengguna baru mendapatkan rekomendasi produk acak pilihan toko.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 💳 Pembayaran (Midtrans Snap)
+- Integrasi penuh dengan **Midtrans Snap** untuk berbagai metode pembayaran (transfer bank, e-wallet, kartu kredit, dll).
+- Notifikasi webhook otomatis untuk pembaruan status pesanan.
+- Mode mock/simulasi pembayaran untuk keperluan pengembangan lokal.
+- Sinkronisasi status transaksi manual jika notifikasi terlambat.
 
-## Security Vulnerabilities
+### 👤 Manajemen Pengguna
+- Registrasi & login pengguna dengan autentikasi token (Laravel Sanctum).
+- Login terpisah untuk akun **admin**.
+- Manajemen profil pengguna (update data diri).
+- Riwayat pesanan dengan detail status dan item yang dipesan.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 🔧 Panel Admin
+- **Dashboard** — Statistik ringkasan toko.
+- **Manajemen Kategori** — CRUD kategori produk (dengan slug & status aktif/nonaktif).
+- **Manajemen Produk** — CRUD produk lengkap dengan gambar, harga, stok, dan spesifikasi.
+- **Manajemen Pesanan** — Lihat dan perbarui status seluruh pesanan pelanggan.
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 🚀 Instalasi Pengembangan Lokal
+
+### Prasyarat
+Pastikan perangkat Anda sudah terinstal:
+- **PHP** >= 8.2 (beserta ekstensi: `pdo_sqlite`, `fileinfo`, `mbstring`)
+- **Composer** >= 2.x
+- **Node.js** >= 20.x & **npm** >= 10.x
+- **Git**
+
+---
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/username/nexatech.git
+cd nexatech
+```
+
+---
+
+### 2. Setup Backend (Laravel)
+
+```bash
+# Instal dependensi PHP
+composer install
+
+# Salin file environment
+cp .env.example .env
+
+# Generate application key
+php artisan key:generate
+
+# Jalankan migrasi database
+php artisan migrate
+
+# (Opsional) Jalankan seeder untuk data awal
+php artisan db:seed
+```
+
+> **Catatan:** Secara default, proyek menggunakan **SQLite** (`database/database.sqlite`). File ini akan otomatis dibuat saat migrasi pertama dijalankan. Jika ingin menggunakan MySQL, ubah konfigurasi `DB_*` di file `.env`.
+
+---
+
+### 3. Setup Midtrans (Pembayaran)
+
+Buka file `.env` dan isi konfigurasi Midtrans:
+
+```env
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxxxxxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxxxxxx
+MIDTRANS_IS_PRODUCTION=false
+
+# Untuk development tanpa akun Midtrans, aktifkan mock:
+MIDTRANS_MOCK_ENABLED=true
+MIDTRANS_MOCK_AUTO_SETTLE=true
+```
+
+> Daftar akun Sandbox Midtrans gratis di [dashboard.midtrans.com](https://dashboard.midtrans.com).
+
+---
+
+### 4. Setup Frontend (Next.js)
+
+```bash
+cd frontend
+
+# Instal dependensi Node.js
+npm install
+
+# Salin file environment frontend
+# (buat file .env.local jika belum ada)
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
+```
+
+---
+
+### 5. Menjalankan Server Development
+
+Buka **dua terminal** secara terpisah:
+
+**Terminal 1 — Backend Laravel:**
+```bash
+# Di root folder nexatech/
+composer run dev
+```
+> Perintah ini secara otomatis menjalankan `php artisan serve`, `php artisan queue:listen`, dan `npm run dev` secara paralel.
+
+**Terminal 2 — Frontend Next.js:**
+```bash
+cd frontend
+npm run dev
+```
+
+---
+
+### 6. Akses Aplikasi
+
+| Layanan | URL |
+|---|---|
+| 🌐 Frontend (Next.js) | `http://localhost:3000` |
+| ⚙️ Backend API (Laravel) | `http://localhost:8000/api` |
+
+---
+
+### ⚡ Cara Cepat (One-Command Setup)
+
+Jika ingin setup backend sekaligus dalam satu perintah:
+
+```bash
+composer run setup
+```
+
+Perintah ini akan menjalankan `composer install`, generate key, migrasi database, `npm install`, dan build asset secara otomatis.
+
+---
+
+## 🧪 Menjalankan Pengujian
+
+```bash
+# Jalankan seluruh test suite (Pest PHP)
+composer run test
+
+# Atau langsung via artisan
+php artisan test
+```
+
+---
+
+## 📄 Lisensi
+
+Proyek ini dilisensikan di bawah [MIT License](https://opensource.org/licenses/MIT).
