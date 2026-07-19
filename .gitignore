@@ -22,3 +22,19 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Python virtual environments & dependencies (jangan di-track)
+.venv-locust/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary dependency folders (digunakan saat setup, bukan kode proyek)
+.codex_tmp/
+tmpdeps/
+wheels/
+
+# Load testing artifacts
+*.locust
